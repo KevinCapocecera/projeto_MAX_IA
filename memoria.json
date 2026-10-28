@@ -1,0 +1,26 @@
+[
+  {
+    "categoria": "projeto",
+    "conteudo": "Desenvolvendo uma automacao em Python para criar solicitacoes de compra no Protheus"
+  },
+  {
+    "categoria": "projeto",
+    "conteudo": "A automacao em Python para solicitacoes de compra no Protheus deve ler produtos e quantidades de uma planilha Excel"
+  },
+  {
+    "categoria": "culinaria",
+    "conteudo": "O usuario demonstrou interesse em dicas de culinaria, especificamente sobre como fazer carbonara"
+  },
+  {
+    "categoria": "preferencia",
+    "conteudo": "O usuario deseja transformar a SEXTA-FEIRA em uma assistente de voz semelhante a Alexa"
+  },
+  {
+    "categoria": "projeto",
+    "conteudo": "O usuario possui um veiculo modelo Fiesta"
+  },
+  {
+    "categoria": "projeto",
+    "conteudo": "Consulta de estoque e carteira de produtos no Protheus, incluindo itens como Guardanapo Verde Bandeira, FORLISBRA-0, Colher Sob branca e Prato raso 15 branco"
+  }
+]

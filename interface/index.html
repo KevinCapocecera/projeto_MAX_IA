@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Max</title>
+<script>
+  // Aplica o tema salvo antes de desenhar a página (evita piscar).
+  try {
+    const tema = localStorage.getItem("sexta-tema");
+    if (tema === "light" || tema === "dark") {
+      document.documentElement.dataset.theme = tema;
+    }
+  } catch (erro) { /* sem armazenamento: segue o tema do Windows */ }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="interface.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topo">
+    <h1 class="nome">Max</h1>
+    <span class="relogio" id="relogio"></span>
+    <div class="topo-direita">
+      <span class="selo selo-demo" id="selo-demo"
+            title="As respostas são simuladas até a interface ser ligada ao Python">Demonstração</span>
+      <span class="selo" id="selo-planilha">Planilha de exemplo</span>
+      <button class="botao-icone" id="botao-tema" type="button" aria-label="Mudar o tema">
+        <svg id="icone-tema" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="centro">
+
+    <section class="presenca" aria-label="Max">
+      <canvas class="matriz" id="matriz" aria-hidden="true"></canvas>
+      <p class="estado" id="estado" aria-live="polite">Iniciando…</p>
+    </section>
+
+    <section class="conversa" id="conversa" aria-label="Conversa">
+      <div class="conversa-dentro">
+        <div class="vazio" id="vazio">
+          <p>Pergunte sobre o estoque de qualquer aba da planilha, ou sobre qualquer outra coisa.</p>
+          <div class="sugestoes">
+            <button class="sugestao" type="button">Como está a Fiesta?</button>
+            <button class="sugestao" type="button">Quais os 5 produtos mais críticos do Talher?</button>
+            <button class="sugestao" type="button">Procura o canudo rosa</button>
+          </div>
+        </div>
+        <div id="mensagens" role="log" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <aside class="andon" aria-labelledby="titulo-andon">
+      <h2 id="titulo-andon">Estoque por aba</h2>
+      <p class="andon-nota">Cobertura comparada à meta de 45 dias, sem o PET. Clique numa aba para perguntar sobre ela.</p>
+      <ul class="legenda" aria-hidden="true">
+        <li><i class="c-critica"></i>Crítica</li>
+        <li><i class="c-alta"></i>Alta</li>
+        <li><i class="c-media"></i>Média</li>
+        <li><i class="c-meta"></i>Na meta</li>
+        <li><i class="c-sem-demanda"></i>Sem demanda</li>
+      </ul>
+      <ul class="abas" id="abas"></ul>
+      <p class="andon-fonte" id="andon-fonte"></p>
+    </aside>
+
+  </main>
+
+  <footer class="compor">
+    <button class="botao-icone mic" id="mic" type="button" disabled
+            aria-label="Falar com a Max (a voz chega na próxima etapa)"
+            title="A voz chega na próxima etapa">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+        <path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path>
+      </svg>
+    </button>
+    <textarea class="entrada" id="entrada" rows="1"
+              aria-label="Mensagem para a Max"
+              placeholder="Digite sua pergunta"></textarea>
+    <button class="enviar" id="enviar" type="button">Enviar</button>
+  </footer>
+
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ============================================================
+     PONTE COM O PYTHON (pywebview)
+     Quando a interface abrir pelo Python, o pywebview cria
+     window.pywebview.api e dispara o evento "pywebviewready".
+       api.perguntar(texto) -> { texto }
+       api.painel()         -> { salva_em, abas: [...] }
+     O Python também pode mudar o estado do painel de LED:
+       window.sexta.estado("consultando")
+     Aberta direto no navegador, a página fica em modo demonstração.
+     ============================================================ */
+  const ponte = () => (window.pywebview && window.pywebview.api) || null;
+
+  /* Dados de exemplo: números reais da planilha salva em 19/10. */
+  const EXEMPLO = {
+    salva_em: "19/10",
+    abas: [
+      { nome: "ANALISE FIESTA", analisados: 144, abaixo: 56,
+        por_prioridade: { "CRÍTICA": 15, "ALTA": 20, "MÉDIA": 21, "DENTRO DA META": 64, "SEM DEMANDA": 24 } },
+      { nome: "ANALISE TALHER", analisados: 268, abaixo: 109,
+        por_prioridade: { "CRÍTICA": 23, "ALTA": 31, "MÉDIA": 55, "DENTRO DA META": 133, "SEM DEMANDA": 26 } },
+      { nome: "ANALISE PRATO", analisados: 137, abaixo: 59,
+        por_prioridade: { "CRÍTICA": 8, "ALTA": 13, "MÉDIA": 38, "DENTRO DA META": 76, "SEM DEMANDA": 2 } },
+      { nome: "ANALISE COPO BCO-TRP", analisados: 153, abaixo: 82,
+        por_prioridade: { "CRÍTICA": 23, "ALTA": 26, "MÉDIA": 33, "DENTRO DA META": 35, "SEM DEMANDA": 36 } },
+      { nome: "ANALISE COPO COLORIDO", analisados: 120, abaixo: 42,
+        por_prioridade: { "CRÍTICA": 4, "ALTA": 13, "MÉDIA": 25, "DENTRO DA META": 75, "SEM DEMANDA": 3 } },
+    ],
+  };
+
+  const PRIORIDADES = [
+    ["CRÍTICA", "c-critica"],
+    ["ALTA", "c-alta"],
+    ["MÉDIA", "c-media"],
+    ["DENTRO DA META", "c-meta"],
+    ["SEM DEMANDA", "c-sem-demanda"],
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const reduzirMovimento = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const normalizar = (texto) =>
+    String(texto).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  /* "ANALISE COPO BCO-TRP" -> "Copo BCO-TRP" */
+  function nomeAmigavel(nome) {
+    const s = String(nome).replace(/^an[aá]lise\s+/i, "").toLowerCase();
+    return s
+      .replace(/\b(bco|trp)\b/g, (m) => m.toUpperCase())
+      .replace(/^./, (c) => c.toUpperCase());
+  }
+
+  /* ============================================================
+     PAINEL DE LED
+     ============================================================ */
+  const COLUNAS = 72;
+  const LINHAS = 17;
+
+  const canvas = $("matriz");
+  const ctx = canvas.getContext("2d");
+  let celula = 10;
+  let cores = { led: [255, 176, 58], apagado: [47, 46, 43], critica: [255, 93, 78] };
+
+  function hexParaRgb(hex) {
+    let h = String(hex).trim().replace("#", "");
+    if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+    const n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  function lerCores() {
+    const estilo = getComputedStyle(document.documentElement);
+    cores = {
+      led: hexParaRgb(estilo.getPropertyValue("--led")),
+      apagado: hexParaRgb(estilo.getPropertyValue("--led-apagado")),
+      critica: hexParaRgb(estilo.getPropertyValue("--critica")),
+    };
+  }
+
+  function dimensionar() {
+    const largura = canvas.clientWidth;
+    if (!largura) return;
+    celula = largura / COLUNAS;
+    const altura = celula * LINHAS;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.height = altura + "px";
+    canvas.width = Math.round(largura * dpr);
+    canvas.height = Math.round(altura * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (reduzirMovimento) desenhar(1);
+  }
+
+  /* Fonte de LED 5x7 só com as letras do nome. */
+  const FONTE_LED = {
+    S: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
+    E: ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
+    X: ["10001", "10001", "01010", "00100", "01010", "10001", "10001"],
+    T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
+    A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
+    "-": ["00000", "00000", "00000", "11111", "00000", "00000", "00000"],
+    F: ["11111", "10000", "10000", "11110", "10000", "10000", "10000"],
+    I: ["01110", "00100", "00100", "00100", "00100", "00100", "01110"],
+    R: ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
+  };
+
+  const NOME = "Max";
+  const larguraNome = NOME.length * 6 - 1;
+  const inicioNome = Math.floor((COLUNAS - larguraNome) / 2);
+  const letreiro = new Set();
+  [...NOME].forEach((letra, i) => {
+    const y0 = Math.floor((LINHAS - 7) / 2);
+    FONTE_LED[letra].forEach((linha, y) => {
+      [...linha].forEach((bit, x) => {
+        if (bit === "1") letreiro.add((y0 + y) * COLUNAS + inicioNome + i * 6 + x);
+      });
+    });
+  });
+
+  function ruido(x, y, s) {
+    const v = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453;
+    return v - Math.floor(v);
+  }
+
+  /* Cada estado é um padrão de brilho (0 a 1) por ponto. */
+  const PADROES = {
+    pronta(x, y, t) {
+      const a = 0.5 + 0.5 * Math.sin(x * 0.17 + y * 0.42 - t * 1.1);
+      const b = 0.5 + 0.5 * Math.sin(t * 0.5 + x * 0.04);
+      return 0.06 + 0.32 * a * b;
+    },
+    pensando(x, y, t) {
+      const posicao = ((t * 30) % (COLUNAS + 16)) - 8;
+      const barra = Math.max(0, 1 - Math.abs(x - posicao) / 5);
+      const faisca = ruido(x, y, Math.floor(t * 8)) > 0.985 ? 0.5 : 0;
+      return 0.06 + 0.85 * barra * (0.75 + 0.25 * Math.sin(y * 0.9 + t * 6)) + faisca;
+    },
+    consultando(x, y, t) {
+      // Lê a "planilha" linha por linha, com colunas de células.
+      const ciclo = (t * 7) % (LINHAS + 4);
+      const linha = Math.floor(ciclo);
+      const separador = x % 9 === 8 ? 0.05 : 1;
+      if (y === linha) {
+        const cursor = (ciclo - linha) * COLUNAS;
+        return x <= cursor ? 0.95 * separador : 0.12;
+      }
+      if (y < linha) {
+        const rastro = Math.exp(-(linha - y) / 3);
+        return 0.06 + 0.4 * rastro * separador * (0.6 + 0.4 * ruido(x, y, 1));
+      }
+      return 0.06;
+    },
+    falando(x, y, t) {
+      const meio = (LINHAS - 1) / 2;
+      const silabas = 0.55 + 0.45 * Math.abs(Math.sin(t * 5.3) * Math.sin(t * 1.7 + 0.6));
+      const altura = silabas * meio *
+        (0.25 + 0.75 * Math.abs(Math.sin(x * 0.42 + t * 8) * Math.cos(x * 0.11 - t * 2.6)));
+      const d = Math.abs(y - meio);
+      return d <= altura ? 0.35 + 0.6 * (1 - d / meio) : 0.05;
+    },
+    ouvindo(x, y, t) {
+      // Ondas em losango a partir do centro (para a etapa de voz).
+      const d = Math.abs(x - (COLUNAS - 1) / 2) / 2.2 + Math.abs(y - (LINHAS - 1) / 2);
+      return 0.06 + 0.7 * Math.pow(0.5 + 0.5 * Math.sin(d * 0.9 - t * 7), 6);
+    },
+    erro(x, y, t) {
+      return Math.floor(t * 4) % 2 === 0 ? 0.35 + 0.4 * ruido(x, y, 2) : 0.08;
+    },
+    inicio(x, y, t) {
+      // Abertura: o nome acende da esquerda para a direita e se desfaz.
+      const noNome = letreiro.has(y * COLUNAS + x) && x - inicioNome <= t * 80;
+      if (t < 1.6) return noNome ? 0.95 : 0.05;
+      const k = Math.min(1, (t - 1.6) / 0.9);
+      if (noNome && ruido(x, y, 3) > k) return 0.95;
+      return 0.05 + (PADROES.pronta(x, y, t) - 0.05) * k;
+    },
+  };
+
+  const TEXTOS_ESTADO = {
+    inicio: "Iniciando…",
+    pronta: "Pronta para conversar",
+    pensando: "Pensando…",
+    consultando: "Consultando a planilha…",
+    falando: "Respondendo",
+    ouvindo: "Ouvindo…",
+    erro: "Não consegui responder agora",
+  };
+
+  let estado = "inicio";
+  let estadoAnterior = "inicio";
+  let mudouEm = 0;
+  let relogioInicio = performance.now() / 1000;
+  const agora = () => performance.now() / 1000 - relogioInicio;
+
+  function definirEstado(nome, texto) {
+    if (!PADROES[nome]) return;
+    if (nome !== estado) {
+      estadoAnterior = estado;
+      estado = nome;
+      mudouEm = agora();
+    }
+    $("estado").textContent = texto || TEXTOS_ESTADO[nome];
+    if (reduzirMovimento) desenhar(1);
+  }
+
+  function intensidade(x, y, t) {
+    const atual = PADROES[estado](x, y, t);
+    const k = Math.min(1, (t - mudouEm) / 0.35);
+    if (k >= 1) return atual;
+    return PADROES[estadoAnterior](x, y, t) * (1 - k) + atual * k;
+  }
+
+  function desenhar(t) {
+    const largura = canvas.clientWidth;
+    const altura = celula * LINHAS;
+    ctx.clearRect(0, 0, largura, altura);
+    const raio = celula * 0.3;
+    const aceso = estado === "erro" ? cores.critica : cores.led;
+    const [ar, ag, ab] = cores.apagado;
+    const [lr, lg, lb] = aceso;
+
+    for (let y = 0; y < LINHAS; y++) {
+      for (let x = 0; x < COLUNAS; x++) {
+        const i = Math.max(0, Math.min(1, intensidade(x, y, t)));
+        const cx = (x + 0.5) * celula;
+        const cy = (y + 0.5) * celula;
+        if (i > 0.7) {
+          ctx.fillStyle = `rgba(${lr},${lg},${lb},${(i - 0.7) * 0.55})`;
+          ctx.beginPath();
+          ctx.arc(cx, cy, raio * 1.9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        const r = Math.round(ar + (lr - ar) * i);
+        const g = Math.round(ag + (lg - ag) * i);
+        const b = Math.round(ab + (lb - ab) * i);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, raio * (0.85 + 0.25 * i), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function quadro() {
+    const t = agora();
+    if (estado === "inicio" && t > 2.6) definirEstado("pronta");
+    desenhar(t);
+    requestAnimationFrame(quadro);
+  }
+
+  /* ============================================================
+     ANDON: ESTOQUE POR ABA
+     ============================================================ */
+  function montarPainel(dados, exemplo) {
+    const lista = $("abas");
+    lista.replaceChildren();
+
+    for (const aba of dados.abas || []) {
+      const nome = nomeAmigavel(aba.nome);
+      const pp = aba.por_prioridade || {};
+      const criticos = pp["CRÍTICA"] || 0;
+
+      const item = document.createElement("li");
+      const botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "aba";
+      botao.dataset.pergunta = `Como está a aba ${nome}?`;
+      botao.setAttribute(
+        "aria-label",
+        `${nome}: ${criticos} críticos, ${aba.abaixo} de ${aba.analisados} abaixo da meta. Perguntar sobre esta aba.`
+      );
+
+      const topo = document.createElement("span");
+      topo.className = "aba-topo";
+      const titulo = document.createElement("span");
+      titulo.className = "aba-nome";
+      titulo.textContent = nome;
+      const crit = document.createElement("span");
+      crit.className = "aba-criticos" + (criticos ? "" : " zero");
+      crit.textContent = criticos === 1 ? "1 crítico" : `${criticos} críticos`;
+      topo.append(titulo, crit);
+
+      const barra = document.createElement("span");
+      barra.className = "barra";
+      barra.setAttribute("aria-hidden", "true");
+      for (const [chave, classe] of PRIORIDADES) {
+        const qtd = pp[chave] || 0;
+        if (!qtd) continue;
+        const seg = document.createElement("i");
+        seg.className = classe;
+        seg.style.flexGrow = qtd;
+        seg.title = `${chave.toLowerCase()}: ${qtd}`;
+        barra.append(seg);
+      }
+
+      const rodape = document.createElement("span");
+      rodape.className = "aba-rodape";
+      rodape.textContent = `${aba.abaixo} de ${aba.analisados} abaixo da meta`;
+
+      botao.append(topo, barra, rodape);
+      botao.addEventListener("click", () => enviar(botao.dataset.pergunta));
+      item.append(botao);
+      lista.append(item);
+    }
+
+    $("andon-fonte").textContent = exemplo
+      ? `Exemplo com a planilha salva em ${dados.salva_em}.`
+      : `Planilha salva em ${dados.salva_em}.`;
+    $("selo-planilha").textContent = exemplo
+      ? "Planilha de exemplo"
+      : `Planilha salva em ${dados.salva_em}`;
+  }
+
+  /* ============================================================
+     CONVERSA
+     ============================================================ */
+  const mensagens = $("mensagens");
+  const conversa = $("conversa");
+  const entrada = $("entrada");
+  const botaoEnviar = $("enviar");
+  let ocupada = false;
+  let voltaParaPronta = null;
+
+  /* Depois de responder, o painel "fala" um pouco e volta ao repouso,
+     sem travar a próxima pergunta. */
+  function voltarParaPronta(ms) {
+    clearTimeout(voltaParaPronta);
+    voltaParaPronta = setTimeout(() => definirEstado("pronta"), ms);
+  }
+
+  function adicionarMensagem(quem, texto, erro = false) {
+    $("vazio").hidden = true;
+
+    const msg = document.createElement("article");
+    msg.className = `msg msg-${quem}` + (erro ? " msg-erro" : "");
+
+    const cabecalho = document.createElement("div");
+    cabecalho.className = "msg-quem";
+    const nome = document.createElement("span");
+    nome.textContent = quem === "voce" ? "Você" : "Max";
+    const hora = document.createElement("time");
+    const d = new Date();
+    hora.dateTime = d.toISOString();
+    hora.textContent = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    cabecalho.append(nome, hora);
+
+    const corpo = document.createElement("div");
+    corpo.className = "msg-texto";
+    corpo.textContent = texto;
+
+    msg.append(cabecalho, corpo);
+    mensagens.append(msg);
+    conversa.scrollTop = conversa.scrollHeight;
+  }
+
+  function ajustarAltura() {
+    entrada.style.height = "auto";
+    entrada.style.height = Math.min(entrada.scrollHeight + 2, 140) + "px";
+  }
+
+  async function enviar(textoDado) {
+    const texto = String(textoDado ?? entrada.value).trim();
+    if (!texto || ocupada) return;
+
+    if (textoDado === undefined) {
+      entrada.value = "";
+      ajustarAltura();
+    }
+    adicionarMensagem("voce", texto);
+
+    ocupada = true;
+    botaoEnviar.disabled = true;
+    clearTimeout(voltaParaPronta);
+    definirEstado("pensando");
+
+    try {
+      const api = ponte();
+      const resposta = api ? await api.perguntar(texto) : await demonstracao(texto);
+      const textoResposta = (resposta && resposta.texto) || "Não recebi uma resposta em texto.";
+      definirEstado("falando");
+      adicionarMensagem("sexta", textoResposta);
+      voltarParaPronta(Math.min(4500, 700 + textoResposta.length * 15));
+    } catch (erro) {
+      definirEstado("erro");
+      adicionarMensagem(
+        "sexta",
+        `Não consegui responder agora. Detalhes: ${(erro && erro.message) || erro}`,
+        true
+      );
+      voltarParaPronta(1600);
+    } finally {
+      ocupada = false;
+      botaoEnviar.disabled = false;
+      entrada.focus();
+    }
+  }
+
+  /* ============================================================
+     MODO DEMONSTRAÇÃO (página aberta direto no navegador)
+     ============================================================ */
+  async function demonstracao(texto) {
+    const t = normalizar(texto);
+    await esperar(700);
+
+    const falaDeCopo = t.includes("copo");
+    const copoClaro = /colorid|bco|branc|trp|transp/.test(t);
+    if (falaDeCopo && !copoClaro) {
+      return { texto: "Tenho duas abas de copo: Copo BCO-TRP e Copo colorido. De qual delas você quer saber?" };
+    }
+
+    const aba = EXEMPLO.abas.find((a) => {
+      const chave = normalizar(nomeAmigavel(a.nome));
+      if (chave === "copo bco-trp") return /bco|branc|trp|transp/.test(t);
+      if (chave === "copo colorido") return t.includes("colorid");
+      return t.includes(chave.split(" ")[0]);
+    });
+
+    const pedeCriticos = /critic|urgent|pior/.test(t);
+    const ehBusca = /procur|busc|acha|encontr/.test(t);
+
+    if (aba || ehBusca) {
+      definirEstado("consultando");
+      await esperar(1100);
+    }
+
+    if (ehBusca && t.includes("canudo") && t.includes("rosa")) {
+      return { texto:
+        "Achei o CLRO10-20X6, canudo 20x10 rosa, na Fiesta. Ele tem 1 caixa em estoque, " +
+        "demanda de 1 caixa por mês e 21 dias de cobertura, então está com prioridade média. " +
+        "Para chegar à meta, a necessidade estimada é de 2 caixas." };
+    }
+
+    if (aba && pedeCriticos && normalizar(aba.nome).includes("talher")) {
+      return { texto:
+        "Estes são os 5 produtos mais críticos do Talher (em caixas):\n" +
+        "TCSMR-50, sobremesa marrom 433: estoque −3, carteira 62, DOH −22, faltam 198\n" +
+        "TCRC-50, refeição cristal: estoque 1.918, carteira 16.255, DOH −18,5, faltam 49.170\n" +
+        "TCRB-50, refeição branco: estoque 1.532, carteira 7.562, DOH −16,7, faltam 22.235\n" +
+        "TCSLVP-50, sobremesa lavanda 445: estoque −2, carteira 35, DOH −15,2, faltam 147\n" +
+        "TCSB-50, sobremesa branco 001: estoque 1.263, carteira 4.408, DOH −15, faltam 12.591" };
+    }
+
+    if (aba) {
+      const pp = aba.por_prioridade;
+      return { texto:
+        `Na aba ${nomeAmigavel(aba.nome)}, ${aba.abaixo} dos ${aba.analisados} produtos estão abaixo ` +
+        `da meta de 45 dias: ${pp["CRÍTICA"]} críticos, ${pp["ALTA"]} com prioridade alta e ` +
+        `${pp["MÉDIA"]} com prioridade média. Outros ${pp["DENTRO DA META"]} estão dentro da meta ` +
+        `e ${pp["SEM DEMANDA"]} estão sem demanda.` };
+    }
+
+    return { texto:
+      "Esta é uma demonstração, então por enquanto eu só respondo às perguntas de exemplo. " +
+      "Quando a interface estiver ligada ao Python, respondo qualquer pergunta, com os dados reais da planilha." };
+  }
+
+  /* ============================================================
+     RELÓGIO E TEMA
+     ============================================================ */
+  const formatoData = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+
+  function atualizarRelogio() {
+    const d = new Date();
+    const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    $("relogio").textContent = `${formatoData.format(d)}, ${hora}`;
+  }
+
+  const raiz = document.documentElement;
+  const escuroNoSistema = matchMedia("(prefers-color-scheme: dark)");
+  const temaAtual = () => raiz.dataset.theme || (escuroNoSistema.matches ? "dark" : "light");
+
+  const ICONE_SOL =
+    '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>';
+  const ICONE_LUA = '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path>';
+
+  function atualizarBotaoTema() {
+    const escuro = temaAtual() === "dark";
+    $("icone-tema").innerHTML = escuro ? ICONE_SOL : ICONE_LUA;
+    $("botao-tema").setAttribute("aria-label", escuro ? "Usar tema claro" : "Usar tema escuro");
+    $("botao-tema").title = escuro ? "Tema claro" : "Tema escuro";
+  }
+
+  function trocarTema() {
+    const novo = temaAtual() === "dark" ? "light" : "dark";
+    raiz.dataset.theme = novo;
+    try { localStorage.setItem("sexta-tema", novo); } catch (erro) { /* sem armazenamento */ }
+    atualizarBotaoTema();
+    lerCores();
+    if (reduzirMovimento) desenhar(1);
+  }
+
+  /* ============================================================
+     INÍCIO
+     ============================================================ */
+  window.sexta = { estado: definirEstado };
+
+  montarPainel(EXEMPLO, true);
+  atualizarRelogio();
+  setInterval(atualizarRelogio, 15000);
+  atualizarBotaoTema();
+  lerCores();
+
+  new ResizeObserver(dimensionar).observe(canvas);
+  dimensionar();
+
+  if (reduzirMovimento) {
+    definirEstado("pronta");
+  } else {
+    requestAnimationFrame(quadro);
+  }
+
+  $("botao-tema").addEventListener("click", trocarTema);
+  escuroNoSistema.addEventListener("change", () => { atualizarBotaoTema(); lerCores(); });
+
+  botaoEnviar.addEventListener("click", () => enviar());
+  entrada.addEventListener("input", ajustarAltura);
+  entrada.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      enviar();
+    }
+  });
+  document.querySelectorAll(".sugestao").forEach((b) =>
+    b.addEventListener("click", () => enviar(b.textContent))
+  );
+
+  window.addEventListener("pywebviewready", async () => {
+    $("selo-demo").hidden = true;
+    try {
+      const dados = await ponte().painel();
+      if (dados && dados.abas) montarPainel(dados, false);
+    } catch (erro) {
+      $("andon-fonte").textContent = `Não consegui ler a planilha: ${(erro && erro.message) || erro}`;
+    }
+  });
+})();
+</script>
+</body>
+</html>

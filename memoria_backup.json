@@ -1,0 +1,10 @@
+[
+  {
+    "categoria": "projeto",
+    "conteudo": "Desenvolvendo uma automação em Python para criar solicitações de compra no Protheus"
+  },
+  {
+    "categoria": "projeto",
+    "conteudo": "A automação em Python para solicitações de compra no Protheus deve ler produtos e quantidades de uma planilha Excel"
+  }
+]
