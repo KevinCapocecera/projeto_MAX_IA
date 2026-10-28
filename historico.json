@@ -626,5 +626,13 @@
   {
     "role": "assistant",
     "content": "Como não temos memórias salvas sobre você ainda, eu não sei o seu nome ou detalhes pessoais, mas você é a pessoa com quem estou conversando agora e ajudando com o PCP e outras tarefas. Quer me contar um pouco sobre você ou precisa de ajuda com alguma análise hoje?"
+  },
+  {
+    "role": "user",
+    "content": "Então eu me apresento pra voce, sou o Kevin, seu criador"
+  },
+  {
+    "role": "assistant",
+    "content": "Prazer em te conhecer oficialmente, Kevin. É ótimo falar com meu criador. Como posso ajudar você hoje, seja com o PCP, com a nossa automação em Python para o Protheus ou com qualquer outra coisa?"
   }
 ]
