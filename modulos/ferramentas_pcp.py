@@ -1,4 +1,4 @@
-"""Ferramentas de PCP que a Max pode usar no chat.
+"""Ferramentas de PCP que o MAX pode usar no chat.
 
 O Gemini decide quando chamar cada função (function calling), mas quem
 calcula é o Python, com os mesmos cálculos do plano de ação, direto na
@@ -16,6 +16,7 @@ Regras das funções expostas ao Gemini (lista FERRAMENTAS_PCP):
 
 import math
 import threading
+from datetime import datetime
 
 import pandas as pd
 
@@ -212,8 +213,33 @@ def _linhas(df):
     ]
 
 
+_ouvintes = []
+
+
+def ao_consultar(funcao):
+    """Registra uma função chamada sempre que uma ferramenta lê a planilha.
+
+    A interface usa isso para mostrar "Consultando a planilha" na hora.
+    A função recebe uma descrição curta do que está sendo consultado.
+    """
+    _ouvintes.append(funcao)
+
+
 def _log(texto):
-    print(f"[Max] Consultando a planilha: {texto}", flush=True)
+    print(f"[MAX] Consultando a planilha: {texto}", flush=True)
+    for funcao in list(_ouvintes):
+        try:
+            funcao(texto)
+        except Exception as erro:
+            print(f"[MAX] Aviso para a interface falhou: {erro}", flush=True)
+
+
+def _contagem(plano):
+    """Quantidade de produtos por prioridade e o total abaixo da meta."""
+    contagem = plano["Prioridade"].value_counts()
+    por_prioridade = {p: int(contagem.get(p, 0)) for p in PRIORIDADES}
+    abaixo = sum(por_prioridade[p] for p in FILTROS["abaixo_da_meta"])
+    return por_prioridade, abaixo
 
 
 # ============================================================
@@ -240,17 +266,14 @@ def resumo_pcp(aba: str) -> dict:
     if erro:
         return erro
 
-    contagem = plano["Prioridade"].value_counts()
-    por_prioridade = {p: int(contagem.get(p, 0)) for p in PRIORIDADES}
+    por_prioridade, abaixo = _contagem(plano)
 
     return {
         "aba": nome,
         "meta_doh_dias": META_DOH,
         "unidade": "caixas",
         "produtos_analisados": len(plano),
-        "abaixo_da_meta": sum(
-            por_prioridade[p] for p in FILTROS["abaixo_da_meta"]
-        ),
+        "abaixo_da_meta": abaixo,
         "por_prioridade": por_prioridade,
         "necessidade_estimada_total": int(
             plano["Necessidade estimada"].sum()
@@ -391,6 +414,32 @@ def exportar_plano_pcp(aba: str) -> dict:
         "arquivo": str(arquivo.resolve()),
         "produtos": len(plano),
     }
+
+
+# ============================================================
+# QUADRO DA INTERFACE (não é ferramenta do Gemini)
+# ============================================================
+
+def painel():
+    """Resumo de todas as abas com análise de DOH, para o quadro "Estoque por aba"."""
+    arquivo = localizar_planilha()
+    salva = datetime.fromtimestamp(arquivo.stat().st_mtime)
+
+    abas = []
+    for nome in abas_disponiveis():
+        try:
+            _, plano = _dados_da_aba(nome)
+        except ValueError:
+            continue  # aba sem DOH (ex.: ANÁLISE ITENS DE COMPRA)
+        por_prioridade, abaixo = _contagem(plano)
+        abas.append({
+            "nome": nome,
+            "analisados": len(plano),
+            "abaixo": abaixo,
+            "por_prioridade": por_prioridade,
+        })
+
+    return {"salva_em": f"{salva:%d/%m} às {salva:%H:%M}", "abas": abas}
 
 
 FERRAMENTAS_PCP = [

@@ -11,7 +11,7 @@ def calcular_plano(df, meta_doh=45):
     """Calcula o plano de ação de uma aba (sem PET), ordenado por prioridade.
 
     Devolve a mesma tabela que vai para o Excel. É usada pela opção 5
-    do menu (main.py) e pelas ferramentas da Max no chat.
+    do menu (main.py) e pelas ferramentas do MAX no chat.
     """
     # Identifica colunas independentemente de maiúsculas e acentos
     def localizar_coluna(nome):

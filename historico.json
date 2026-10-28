@@ -494,5 +494,137 @@
   {
     "role": "assistant",
     "content": "Olá! Tudo bem por aqui. Como posso te ajudar com o PCP ou qualquer outro assunto hoje?"
+  },
+  {
+    "role": "user",
+    "content": "eai max tudo bem?"
+  },
+  {
+    "role": "assistant",
+    "content": "Tudo ótimo por aqui, e com você? Como posso te ajudar hoje?"
+  },
+  {
+    "role": "user",
+    "content": "Estou bem tbm, qual o nosso estoque de FORLISBRA-0?"
+  },
+  {
+    "role": "assistant",
+    "content": "O estoque atual do FORLISBRA-0, que é a forminha de papel branca da linha Fiesta, é de 14 caixas. Ele está com prioridade crítica, DOH de 1,4 dias negativos e uma necessidade estimada de 34 caixas para atingir a meta."
+  },
+  {
+    "role": "user",
+    "content": "quantas eu tenho que fazer?"
+  },
+  {
+    "role": "assistant",
+    "content": "Para o produto FORLISBRA-0, a necessidade estimada é de 34 caixas para atingir o estoque alvo e a meta de 45 dias de DOH."
+  },
+  {
+    "role": "user",
+    "content": "Como está a aba Fiesta?"
+  },
+  {
+    "role": "assistant",
+    "content": "Na aba Fiesta temos 144 produtos analisados. 70 estão dentro da meta, 22 sem demanda e 52 estão abaixo da meta, sendo 20 com prioridade crítica, 11 alta e 21 média. A necessidade estimada total para cobrir o estoque alvo e atingir a meta de 45 dias de DOH é de 2.921 caixas. Quer que eu liste os mais urgentes?"
+  },
+  {
+    "role": "user",
+    "content": "Como está a aba Copo BCO-TRP?"
+  },
+  {
+    "role": "assistant",
+    "content": "Na aba de copos branco e transparente temos 153 produtos analisados. 35 estão dentro da meta, 36 sem demanda e 82 estão abaixo da meta, sendo 21 com prioridade crítica, 31 alta e 30 média. A necessidade estimada total para cobrir o estoque alvo e atingir a meta de 45 dias de DOH é de 358.276 caixas. Quer que eu liste os mais urgentes dessa aba?"
+  },
+  {
+    "role": "user",
+    "content": "liste os 21 com prioridade critica"
+  },
+  {
+    "role": "assistant",
+    "content": "Estes sao os 21 produtos com prioridade critica na aba Copo BCO-TRP:\nCAVT-200, Copo PS, Transparente, estoque 0, necessidade de 18858 caixas\nCBFSMT-500, Copo PS, Transparente, estoque 0, necessidade de 79 caixas\nCSIT-200, Copo PS, Transparente, estoque 2, necessidade de 7818 caixas\nCOT-200, Copo PS, Transparente, estoque 1646, necessidade de 39840 caixas\nCMST-200, Copo PS, Transparente, estoque 2404, necessidade de 24867 caixas\nCCFB100-180, Copo PS, Branco, estoque 288, necessidade de 2937 caixas\nCSRT-200, Copo PS, Transparente, estoque 1433, necessidade de 13653 caixas\nCVTP-300, Copo PP, Transparente, estoque 81, necessidade de 510 caixas\nCMSB-200, Copo PS, Branco, estoque 1387, necessidade de 8677 caixas\nCCBT-200, Copo PS, Transparente, estoque 16848, necessidade de 102506 caixas\nCVTP-200, Copo PP, Transparente, estoque -72, necessidade de 13822 caixas\nCCFB100-300, Copo PS, Branco, estoque 366, necessidade de 1611 caixas\nCCFB100-50, Copo PS, Branco, estoque 165, necessidade de 709 caixas\nCCBB-200, Copo PS, Branco, estoque 4378, necessidade de 54731 caixas\nCCT-200, Copo PS, Transparente, estoque 218, necessidade de 694 caixas\nCVTP-770, Copo PP Liso, Transparente, estoque 340, necessidade de 1906 caixas\nCCBB-180, Copo PS, Branco, estoque 1844, necessidade de 4983 caixas\nCVB-50, Copo PS, Branco, estoque 196, necessidade de 973 caixas\nCMSB-50, Copo PS, Branco, estoque 440, necessidade de 1237 caixas\nCPT-200, Copo PS, Transparente, estoque 0, necessidade de 215 caixas\nCAMT-200, Copo PS, Transparente, estoque 0, necessidade de 1500 caixas"
+  },
+  {
+    "role": "user",
+    "content": "eai max tudo bem ?"
+  },
+  {
+    "role": "assistant",
+    "content": "Tudo ótimo por aqui, seguimos firmes. E com você, tudo certo? Como posso te ajudar mais agora?"
+  },
+  {
+    "role": "user",
+    "content": "Como está a aba Copo colorido?"
+  },
+  {
+    "role": "assistant",
+    "content": "Na aba de copos coloridos temos 120 produtos analisados. 75 estão dentro da meta, 4 sem demanda e 41 estão abaixo da meta, sendo 8 com prioridade crítica, 9 alta e 24 média. A necessidade estimada total para cobrir o estoque alvo e atingir a meta de 45 dias de DOH é de 3.968 caixas. Quer que eu liste os mais urgentes dessa aba?"
+  },
+  {
+    "role": "user",
+    "content": "quais são os criticos?"
+  },
+  {
+    "role": "user",
+    "content": "Quais são os criticos?"
+  },
+  {
+    "role": "assistant",
+    "content": "Estes sao os 8 produtos com prioridade critica na aba Copo colorido:\nCBFNLJ-330, Copo PS, Neon Laranja 449, estoque -4, necessidade de 169 caixas\nCBFDO-330, Copo PS, Dourado 432, estoque 2, necessidade de 94 caixas\nCCNRO-200, Copo PS, Neon Rosa 450, estoque 10, necessidade de 61 caixas\nCCMR-200, Copo PS, Marrom 433, estoque 7, necessidade de 80 caixas\nCCMEP-200, Copo PS, Verde Menta 451, estoque 0, necessidade de 3 caixas\nCBFROP-330, Copo PS, Rosa Perolado 428, estoque 0, necessidade de 18 caixas\nCBFAZPP-330, Copo PS, Azul Petróleo 443, estoque 0, necessidade de 35 caixas\nCBFNVC-60, Copo PS, Neon Verde Claro 459, estoque 0, necessidade de 24 caixas"
+  },
+  {
+    "role": "user",
+    "content": "Como está a aba Fiesta?"
+  },
+  {
+    "role": "assistant",
+    "content": "Na aba Fiesta temos 144 produtos analisados. 70 estão dentro da meta, 22 sem demanda e 52 estão abaixo da meta, sendo 20 com prioridade crítica, 11 alta e 21 média. A necessidade estimada total para cobrir o estoque alvo e atingir a meta de 45 dias de DOH é de 2.921 caixas. Quer que eu liste os mais urgentes dessa aba?"
+  },
+  {
+    "role": "user",
+    "content": "Como está a aba Talher?"
+  },
+  {
+    "role": "assistant",
+    "content": "Na aba Talher temos 268 produtos analisados. 123 estão dentro da meta, 29 sem demanda e 116 estão abaixo da meta, sendo 40 com prioridade crítica, 31 alta e 45 média. A necessidade estimada total para cobrir o estoque alvo e atingir a meta de 45 dias de DOH é de 227.495 caixas. Quer que eu liste os mais urgentes dessa aba?"
+  },
+  {
+    "role": "user",
+    "content": "Como está a aba Prato?"
+  },
+  {
+    "role": "assistant",
+    "content": "Na aba Prato temos 137 produtos analisados. 79 estão dentro da meta, 2 sem demanda e 56 estão abaixo da meta, sendo 9 com prioridade crítica, 19 alta e 28 média. A necessidade estimada total para cobrir o estoque alvo e atingir a meta de 45 dias de DOH é de 21.167 caixas. Quer que eu liste os mais urgentes dessa aba?"
+  },
+  {
+    "role": "user",
+    "content": "Consegue limpar o chat?"
+  },
+  {
+    "role": "assistant",
+    "content": "Eu não consigo apagar o histórico de mensagens da tela diretamente, mas podemos começar um assunto novo quando você quiser. Como posso te ajudar agora?"
+  },
+  {
+    "role": "user",
+    "content": "Que dia é hoje?"
+  },
+  {
+    "role": "assistant",
+    "content": "Hoje é quarta-feira, 28 de outubro de 2026. Como posso te ajudar?"
+  },
+  {
+    "role": "user",
+    "content": "e que horas são?"
+  },
+  {
+    "role": "assistant",
+    "content": "Agora são 17:17. Posso ajudar com mais alguma coisa, como verificar o PCP ou planejar suas tarefas?"
+  },
+  {
+    "role": "user",
+    "content": "Quem sou eu?"
+  },
+  {
+    "role": "assistant",
+    "content": "Como não temos memórias salvas sobre você ainda, eu não sei o seu nome ou detalhes pessoais, mas você é a pessoa com quem estou conversando agora e ajudando com o PCP e outras tarefas. Quer me contar um pouco sobre você ou precisa de ajuda com alguma análise hoje?"
   }
 ]

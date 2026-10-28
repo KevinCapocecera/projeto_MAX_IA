@@ -10,8 +10,8 @@ from modulos.base_dados import (
 )
 
 
-def iniciar_sexta_feira():
-    print("\nMax | ASSISTENTE DE PCP")
+def iniciar_max():
+    print("\nMAX | ASSISTENTE DE PCP")
 
     try:
         arquivo = localizar_planilha()
@@ -35,7 +35,7 @@ def iniciar_sexta_feira():
         escolha = input("\nEscolha uma aba: ").strip()
 
         if escolha == "0":
-            print("Max: Até a próxima!")
+            print("MAX: Até a próxima!")
             break
 
         if not escolha.isdigit():
@@ -56,7 +56,7 @@ def iniciar_sexta_feira():
             print(f"Erro ao ler a aba: {erro}")
             continue
 
-        print(f"\nMax: Analisando {nome_aba}")
+        print(f"\nMAX: Analisando {nome_aba}")
         print(f"Registros encontrados: {len(df)}")
         print("Colunas disponíveis:")
         print(", ".join(map(str, df.columns)))
@@ -102,7 +102,7 @@ def iniciar_sexta_feira():
                     print(f"Erro ao gerar o plano de ação: {erro}")
 
             elif opcao == "0":
-                print("Max: Até a próxima!")
+                print("MAX: Até a próxima!")
                 return
 
             else:
@@ -110,4 +110,4 @@ def iniciar_sexta_feira():
 
 
 if __name__ == "__main__":
-    iniciar_sexta_feira()
+    iniciar_max()

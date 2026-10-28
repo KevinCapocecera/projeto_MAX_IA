@@ -1,4 +1,4 @@
-# Dependências da Max (versões que já funcionavam nas duas venvs)
+# Dependências do MAX (versões que já funcionavam nas duas venvs)
 # Instalação (bash): .venv/Scripts/python -m pip install -r requirements.txt
 
 # Planilhas (assistente de PCP)
@@ -9,6 +9,9 @@ python-dateutil==2.9.0.post0  # a mesma da sua .venv (sem isso viria a 3.0.0)
 # Chat com o Gemini
 google-genai==2.31.0
 python-dotenv==1.2.4
+
+# Interface nova (max.py): abre o interface/index.html numa janela
+pywebview==6.2.1
 
 # Voz (testes de microfone)
 SpeechRecognition==3.17.0
