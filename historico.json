@@ -666,5 +666,85 @@
   {
     "role": "assistant",
     "content": "Kevin, a aba Analise Itens de Compra não está estruturada com as colunas padrão de DOH e demanda que o sistema lê, então não consigo filtrar diretamente pelo status Comprar por aqui. Se você preferir, posso verificar o estoque, DOH e necessidades de compra nas outras abas da análise diária, como Fiesta, Talher, Prato, Copo Bco-Trp ou Copo Colorido. Quer dar uma olhada em alguma delas?"
+  },
+  {
+    "role": "user",
+    "content": "Eai MAX"
+  },
+  {
+    "role": "assistant",
+    "content": "E aí, Kevin! Tudo bem por aí? \n\nMe desculpe pela confusão anterior sobre a aba de itens de compra. Já entendi que posso consultar qualquer aba da planilha, incluindo a ANÁLISE ITENS DE COMPRA. \n\nDeixa eu dar uma olhada certa nela agora para ver os itens com o status Comprar para você. Um momento."
+  },
+  {
+    "role": "user",
+    "content": "sabe quem sou eu ?"
+  },
+  {
+    "role": "assistant",
+    "content": "Sim, Kevin! Você é meu criador, com quem estou conversando agora. Agora deixa eu consultar a aba ANÁLISE ITENS DE COMPRA para trazer os itens com o status Comprar para você. Um momento."
+  },
+  {
+    "role": "user",
+    "content": "Consulte pra mim"
+  },
+  {
+    "role": "assistant",
+    "content": "Consultando a aba ANÁLISE ITENS DE COMPRA, encontrei 31 itens com o status Comprar. Aqui estão os principais com maior quantidade de compra:\n\nMINI COLHER PS CRISTAL BELLO FESTAS 20X200 - Quantidade de compra: 429\nMEXEDOR DE CAFE PS CRISTAL BELLO FESTAS 20X500 - Quantidade de compra: 316.75\nBANDEJA LAMINADA PRATA N06 BELLO FESTAS 10X1 - Quantidade de compra: 233\nVELA FONTE ESTRELAR SORTIDO BELLOFESTAS 10X1 - Quantidade de compra: 165.25\nBANDEJA LAMINADA PRATA N04 BELLO FESTAS 10X1 - Quantidade de compra: 104.5\nBANDEJA LAMINADA PRATA N07 BELLO FESTAS 10X1 - Quantidade de compra: 97.25\nBANDEJA LAMINADA PRATA N05 BELLO FESTAS 10X1 - Quantidade de compra: 80\nMEXEDOR DE DRINK PS CRISTAL BELLO FESTAS 20X500 - Quantidade de compra: 62\nCAKE BOARD 22,4CM PRATA BELLO FESTAS 10X1 - Quantidade de compra: 46.5\nPRATO LAMINADO PRATA N06 BELLO FESTAS 10X1 - Quantidade de compra: 42.25\n\nQuer que eu mostre o restante dos itens dessa lista ou detalhe mais alguma informação sobre eles, Kevin?"
+  },
+  {
+    "role": "user",
+    "content": "mostre todos os itens por favor ?"
+  },
+  {
+    "role": "assistant",
+    "content": "Consultando a aba ANÁLISE ITENS DE COMPRA, aqui estão todos os 31 itens com o status Comprar, mostrando o produto e a quantidade de compra:\n\nBANDEJA LAMINADA PRATA N04 BELLO FESTAS 10X1 - Quantidade de compra: 104.5\nBANDEJA LAMINADA PRATA N05 BELLO FESTAS 10X1 - Quantidade de compra: 80\nBANDEJA LAMINADA PRATA N06 BELLO FESTAS 10X1 - Quantidade de compra: 233\nBANDEJA LAMINADA PRATA N07 BELLO FESTAS 10X1 - Quantidade de compra: 97.25\nBANDEJA LAMINADA PRATA N12 BELLO FESTAS 10X1 - Quantidade de compra: 40.25\nBANDEJA LAMINADA ROCAMBOLE PRATA BELLO FESTAS 10X1 - Quantidade de compra: 27.75\nCAKE BOARD 18CM BRANCO BELLO FESTAS 10X1 - Quantidade de compra: 6.25\nCAKE BOARD 22,4CM BRANCO BELLO FESTAS 10X1 - Quantidade de compra: 21.25\nCAKE BOARD 29,5CM BRANCO BELLO FESTAS 10X1 - Quantidade de compra: 7\nCAKE BOARD 22,4CM OURO BELLO FESTAS 10X1 - Quantidade de compra: 25.25\nCAKE BOARD 18CM PRATA BELLO FESTAS 10X1 - Quantidade de compra: 10.5\nCAKE BOARD 22,4CM PRATA BELLO FESTAS 10X1 - Quantidade de compra: 46.5\nKIT FESTA PS AMARELO BELLO FESTAS 8X30 - Quantidade de compra: 1\nKIT FESTA PS AZUL ESCUTO BELLO FESTAS 8X30 - Quantidade de compra: 1\nKIT FESTA PS PINK BELLO FESTAS 8X30 - Quantidade de compra: 2\nKIT FESTA PS PRETO BELLO FESTAS 8X30 - Quantidade de compra: 2\nKIT FESTA PS ROXO BELLO FESTAS 8X30 - Quantidade de compra: 1\nMINI COLHER PS CRISTAL BELLO FESTAS 20X200 - Quantidade de compra: 429\nMEXEDOR DE DRINK PS CRISTAL BELLO FESTAS 20X500 - Quantidade de compra: 62\nMEXEDOR DE CAFE PS CRISTAL BELLO FESTAS 20X500 - Quantidade de compra: 316.75\nPRATO LAMINADO PRATA N06 BELLO FESTAS 10X1 - Quantidade de compra: 42.25\nVELA TUBULAR 0 AZUL BELLO FESTAS 10X1 - Quantidade de compra: 32.5\nVELA TUBULAR 6 AZUL BELLO FESTAS 10X1 - Quantidade de compra: 5.5\nVELA TUBULAR 7 AZUL BELLO FESTAS 10X1 - Quantidade de compra: 7\nVELA TUBULAR 0 DOURADO BELLO FESTAS 10X1 - Quantidade de compra: 0.75\nVELA TUBULAR 8 PRATA BELLO FESTAS 10X1 - Quantidade de compra: 0.5\nVELA TUBULAR 0 ROSA CLARO BELLO FESTAS 10X1 - Quantidade de compra: 21.25\nVELA FONTE ESTRELAR SORTIDO BELLOFESTAS 10X1 - Quantidade de compra: 165.25\nVELA 8 AZUL BELLO FESTAS 10X1 - Quantidade de compra: 3.5\nVELA 1 BRANCO BELLO FESTAS 10X1 - Quantidade de compra: 0.5\nVELA 7 ROSA BELLO FESTAS 10X1 - Quantidade de compra: 3"
+  },
+  {
+    "role": "user",
+    "content": "Me monte uma tabela de quais são os fornecedores desses itens"
+  },
+  {
+    "role": "assistant",
+    "content": "Não consegui fechar a resposta: precisei consultar a planilha mais vezes do que o limite. Tente perguntar de forma mais específica, citando a aba."
+  },
+  {
+    "role": "user",
+    "content": "tem problema não"
+  },
+  {
+    "role": "assistant",
+    "content": "Como o formato aqui é em texto simples e não suporta tabelas estruturadas, organizei os fornecedores de cada um dos 31 itens listados para você com base na aba de cadastro de itens e fornecedores:\n\nBANDEJA LAMINADA PRATA N04 BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nBANDEJA LAMINADA PRATA N05 BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nBANDEJA LAMINADA PRATA N06 BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nBANDEJA LAMINADA PRATA N07 BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nBANDEJA LAMINADA PRATA N12 BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nBANDEJA LAMINADA ROCAMBOLE PRATA BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nCAKE BOARD 18CM BRANCO BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nCAKE BOARD 22,4CM BRANCO BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nCAKE BOARD 29,5CM BRANCO BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nCAKE BOARD 22,4CM OURO BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nCAKE BOARD 18CM PRATA BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nCAKE BOARD 22,4CM PRATA BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nKIT FESTA PS AMARELO BELLO FESTAS 8X30 - Fornecedor: BelloCopo\nKIT FESTA PS AZUL ESCUTO BELLO FESTAS 8X30 - Fornecedor: BelloCopo\nKIT FESTA PS PINK BELLO FESTAS 8X30 - Fornecedor: BelloCopo\nKIT FESTA PS PRETO BELLO FESTAS 8X30 - Fornecedor: BelloCopo\nKIT FESTA PS ROXO BELLO FESTAS 8X30 - Fornecedor: BelloCopo\nMINI COLHER PS CRISTAL BELLO FESTAS 20X200 - Fornecedor: BelloCopo\nMEXEDOR DE DRINK PS CRISTAL BELLO FESTAS 20X500 - Fornecedor: BelloCopo\nMEXEDOR DE CAFE PS CRISTAL BELLO FESTAS 20X500 - Fornecedor: BelloCopo\nPRATO LAMINADO PRATA N06 BELLO FESTAS 10X1 - Fornecedor: Brilho Festa\nVELA TUBULAR 0 AZUL BELLO FESTAS 10X1 - Fornecedor: Sonho Encantado\nVELA TUBULAR 6 AZUL BELLO FESTAS 10X1 - Fornecedor: Sonho Encantado\nVELA TUBULAR 7 AZUL BELLO FESTAS 10X1 - Fornecedor: Sonho Encantado\nVELA TUBULAR 0 DOURADO BELLO FESTAS 10X1 - Fornecedor: Sonho Encantado\nVELA TUBULAR 8 PRATA BELLO FESTAS 10X1 - Fornecedor: Sonho Encantado\nVELA TUBULAR 0 ROSA CLARO BELLO FESTAS 10X1 - Fornecedor: Sonho Encantado\nVELA FONTE ESTRELAR SORTIDO BELLOFESTAS 10X1 - Fornecedor: Importado\nVELA 8 AZUL BELLO FESTAS 10X1 - Fornecedor: Sonho Encantado\nVELA 1 BRANCO BELLO FESTAS 10X1 - Fornecedor: Sonho Encantado\nVELA 7 ROSA BELLO FESTAS 10X1 - Fornecedor: Sonho Encantado\n\nSe precisar agrupar isso por fornecedor ou ver mais detalhes, é só falar, Kevin!"
+  },
+  {
+    "role": "user",
+    "content": "quantas caixas temos de copo bom transparente?"
+  },
+  {
+    "role": "assistant",
+    "content": "Para responder sobre o estoque de copos brancos e transparentes, consultei a aba de análise do PCP. No total, a linha de copos branco e transparente possui 153 produtos analisados, sendo 22 em prioridade crítica, 29 em alta e 30 em média. A necessidade estimada total de produção para atingir a meta de 45 dias de DOH é de 364.099 caixas. \n\nSe quiser que eu busque o estoque de algum modelo ou referência específica de copo transparente, é só me passar o código ou o nome exato, Kevin."
+  },
+  {
+    "role": "user",
+    "content": "Voce consegue ler as abas BD?"
+  },
+  {
+    "role": "assistant",
+    "content": "Consigo sim, Kevin. As abas que começam com BD na planilha são BD.Prev.Insumos, BD.Prev.Produtos, BD.ESTOQUE CARTEIRA e a aba oculta BD.BOBINAS. Posso consultar qualquer uma delas para você, é só me dizer qual informação precisa."
+  },
+  {
+    "role": "user",
+    "content": "quantas caixas temos na data de ontem do item CCBT-200?"
+  },
+  {
+    "role": "assistant",
+    "content": "Consultando a aba BD.ESTOQUE CARTEIRA, para o item CCBT-200, que corresponde ao COPO PS 200ML TRANSPARENTE COPOBOM 25X100UN, a quantidade registrada na data de ontem, 28/10/2026, foi de 17893 caixas, Kevin."
+  },
+  {
+    "role": "user",
+    "content": "e do CopoBom Branco 200ml"
+  },
+  {
+    "role": "assistant",
+    "content": "Consultando a aba BD.ESTOQUE CARTEIRA para o CopoBom Branco 200ml, que corresponde ao código CCBB-200 (COPO PS 200ML BRANCO COPOBOM 25X100UN), a quantidade de estoque registrada na data de ontem, 28/10/2026, foi de 4.343 caixas, Kevin."
   }
 ]

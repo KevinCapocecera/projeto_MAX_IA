@@ -1,11 +1,19 @@
 [
   {
+    "categoria": "usuario",
+    "conteudo": "O usuario se chama Kevin e e o criador do MAX"
+  },
+  {
     "categoria": "projeto",
     "conteudo": "Desenvolvendo uma automacao em Python para criar solicitacoes de compra no Protheus"
   },
   {
     "categoria": "projeto",
     "conteudo": "A automacao em Python para solicitacoes de compra no Protheus deve ler produtos e quantidades de uma planilha Excel"
+  },
+  {
+    "categoria": "projeto",
+    "conteudo": "Na planilha de solicitacao de compra do Protheus, a aba Analise Itens de Compra contem a coluna de Analise com o status Comprar para identificar itens que precisam ser adquiridos"
   },
   {
     "categoria": "culinaria",
@@ -21,14 +29,6 @@
   },
   {
     "categoria": "projeto",
-    "conteudo": "Consulta de estoque e carteira de produtos no Protheus, incluindo itens como Guardanapo Verde Bandeira, FORLISBRA-0, Colher Sob branca, Prato raso 15 branco, Copo BCO-TRP e Copo colorido"
-  },
-  {
-    "categoria": "usuario",
-    "conteudo": "O usuario se chama Kevin e e o criador do MAX"
-  },
-  {
-    "categoria": "projeto",
-    "conteudo": "Na planilha de solicitacao de compra do Protheus, a aba Analise Itens de Compra contem a coluna de Analise com o status Comprar para identificar itens que precisam ser adquiridos"
+    "conteudo": "Consulta de estoque e carteira de produtos no Protheus, incluindo itens como Guardanapo Verde Bandeira, FORLISBRA-0, Colher Sob branca, Prato raso 15 branco, Copo BCO-TRP, Copo colorido, copo bom transparente, CCBT-200 e CopoBom Branco 200ml"
   }
 ]
