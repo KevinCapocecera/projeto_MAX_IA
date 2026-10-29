@@ -115,6 +115,9 @@
   .app {
     height: 100%;
     display: grid;
+    /* minmax(0, 1fr): nada (letreiro, lista de abas) alarga a página
+       além da tela no celular. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
@@ -698,7 +701,16 @@
 
   const canvas = $("matriz");
   const ctx = canvas.getContext("2d");
-  let celula = 10;
+  /* Desempenho: em vez de desenhar 1.224 círculos a cada quadro, cada
+     nível de brilho do LED é desenhado uma vez só numa "folha" (atlas)
+     e copiado para o painel. Só os pontos que mudaram de brilho são
+     redesenhados, e a animação roda a no máximo 30 quadros por segundo
+     (cai para 15 sozinha em computadores mais fracos). */
+  const NIVEIS = 40;          // tons de brilho de cada LED
+  let lado = 0;               // tamanho de cada LED, em pixels da tela
+  let margem = 0;             // deslocamento à esquerda (hoje sempre 0)
+  let atlas = null;
+  const desenhados = new Int16Array(COLUNAS * LINHAS).fill(-1);
   let cores = { led: [255, 176, 58], apagado: [47, 46, 43], critica: [255, 93, 78] };
 
   function hexParaRgb(hex) {
@@ -715,18 +727,54 @@
       apagado: hexParaRgb(estilo.getPropertyValue("--led-apagado")),
       critica: hexParaRgb(estilo.getPropertyValue("--critica")),
     };
+    prepararAtlas();
+  }
+
+  /* Desenha uma vez cada nível de brilho: linha 0 na cor do LED,
+     linha 1 na cor de erro. */
+  function prepararAtlas() {
+    if (!lado) return;
+    atlas = document.createElement("canvas");
+    atlas.width = lado * NIVEIS;
+    atlas.height = lado * 2;
+    const a = atlas.getContext("2d");
+    const raio = lado * 0.3;
+    const [ar, ag, ab] = cores.apagado;
+    [cores.led, cores.critica].forEach(([lr, lg, lb], linha) => {
+      for (let n = 0; n < NIVEIS; n++) {
+        const i = n / (NIVEIS - 1);
+        const cx = n * lado + lado / 2;
+        const cy = linha * lado + lado / 2;
+        if (i > 0.7) {
+          a.fillStyle = `rgba(${lr},${lg},${lb},${(i - 0.7) * 0.55})`;
+          a.beginPath();
+          a.arc(cx, cy, Math.min(raio * 1.9, lado / 2), 0, Math.PI * 2);
+          a.fill();
+        }
+        const r = Math.round(ar + (lr - ar) * i);
+        const g = Math.round(ag + (lg - ag) * i);
+        const b = Math.round(ab + (lb - ab) * i);
+        a.fillStyle = `rgb(${r},${g},${b})`;
+        a.beginPath();
+        a.arc(cx, cy, raio * (0.85 + 0.25 * i), 0, Math.PI * 2);
+        a.fill();
+      }
+    });
+    desenhados.fill(-1);  // força redesenhar tudo com as cores novas
   }
 
   function dimensionar() {
     const largura = canvas.clientWidth;
     if (!largura) return;
-    celula = largura / COLUNAS;
-    const altura = celula * LINHAS;
+    // Cada LED ocupa um número inteiro de pixels (sem emendas entre
+    // eles); o navegador ajusta o painel à largura disponível.
     const dpr = window.devicePixelRatio || 1;
-    canvas.style.height = altura + "px";
-    canvas.width = Math.round(largura * dpr);
-    canvas.height = Math.round(altura * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    lado = Math.max(2, Math.round((largura * dpr) / COLUNAS));
+    margem = 0;
+    canvas.width = lado * COLUNAS;
+    canvas.height = lado * LINHAS;
+    canvas.style.height = (largura * LINHAS) / COLUNAS + "px";
+    prepararAtlas();
     if (reduzirMovimento) desenhar(1);
   }
 
@@ -864,41 +912,41 @@
   }
 
   function desenhar(t) {
-    const largura = canvas.clientWidth;
-    const altura = celula * LINHAS;
-    ctx.clearRect(0, 0, largura, altura);
-    const raio = celula * 0.3;
-    const aceso = estado === "erro" ? cores.critica : cores.led;
-    const [ar, ag, ab] = cores.apagado;
-    const [lr, lg, lb] = aceso;
+    if (!atlas) return;
+    const linhaCor = estado === "erro" ? 1 : 0;
+    const base = linhaCor * NIVEIS;
 
     for (let y = 0; y < LINHAS; y++) {
       for (let x = 0; x < COLUNAS; x++) {
         const i = Math.max(0, Math.min(1, intensidade(x, y, t)));
-        const cx = (x + 0.5) * celula;
-        const cy = (y + 0.5) * celula;
-        if (i > 0.7) {
-          ctx.fillStyle = `rgba(${lr},${lg},${lb},${(i - 0.7) * 0.55})`;
-          ctx.beginPath();
-          ctx.arc(cx, cy, raio * 1.9, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        const r = Math.round(ar + (lr - ar) * i);
-        const g = Math.round(ag + (lg - ag) * i);
-        const b = Math.round(ab + (lb - ab) * i);
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
-        ctx.beginPath();
-        ctx.arc(cx, cy, raio * (0.85 + 0.25 * i), 0, Math.PI * 2);
-        ctx.fill();
+        const nivel = Math.round(i * (NIVEIS - 1));
+        const k = y * COLUNAS + x;
+        if (desenhados[k] === base + nivel) continue;  // não mudou
+        desenhados[k] = base + nivel;
+        const px = margem + x * lado;
+        const py = y * lado;
+        ctx.clearRect(px, py, lado, lado);
+        ctx.drawImage(atlas, nivel * lado, linhaCor * lado, lado, lado, px, py, lado, lado);
       }
     }
   }
 
+  let intervalo = 1 / 30;   // segundos entre quadros
+  let ultimoQuadro = -1;
+  let custoMedio = 0;       // milissegundos por quadro (média)
+
   function quadro() {
-    const t = agora();
-    if (estado === "inicio" && t > 2.6) definirEstado("pronto");
-    desenhar(t);
     requestAnimationFrame(quadro);
+    const t = agora();
+    if (t - ultimoQuadro < intervalo - 0.004) return;
+    ultimoQuadro = t;
+    if (estado === "inicio" && t > 2.6) definirEstado("pronto");
+
+    const comeco = performance.now();
+    desenhar(t);
+    custoMedio = custoMedio * 0.9 + (performance.now() - comeco) * 0.1;
+    if (custoMedio > 8) intervalo = 1 / 15;        // PC fraco: menos quadros
+    else if (custoMedio < 3) intervalo = 1 / 30;
   }
 
   /* ============================================================
