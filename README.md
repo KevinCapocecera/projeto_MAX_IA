@@ -294,6 +294,7 @@ Fica em `interface/index.html`, num arquivo só, com HTML, CSS e JavaScript.
 
 - **Painel de LED (72 × 17)** mostra o estado do MAX: *Iniciando* (o nome MAX acende), *Pronto*, *Pensando*, *Consultando a planilha*, *Respondendo* e *Erro*. Cada nível de brilho é desenhado uma vez só e copiado, e só os LEDs que mudaram são redesenhados. Assim ele roda a 60 quadros por segundo mesmo em PCs fracos, e cai sozinho para 30 se o PC não der conta.
 - **Quadro "Estoque por aba"** mostra os dados reais da planilha e é atualizado a cada resposta e a cada 2 minutos. Clicar numa aba faz a pergunta sobre ela.
+- **Ícone da aba:** um "M" aceso num pedaço do painel de LED. Ele está embutido no `index.html`, então aparece também na janela e no modo demonstração. Os arquivos ficam em `interface/icone.*`.
 - **Tema claro e escuro:** segue o Windows, com um botão para trocar.
 - **Celular:** a página se ajusta à tela.
 - **Medidor de desempenho:** abra o endereço com `?fps` no fim (`http://nome-do-pc:8000/?fps`) para ver quadros por segundo e o tempo de desenho de cada quadro.
@@ -329,6 +330,9 @@ projeto_MAX_IA/
 │
 ├── interface/
 │   ├── index.html            Interface atual (painel de LED, chat e quadro)
+│   ├── icone.svg             Ícone do MAX ("M" no painel de LED)
+│   ├── icone.ico             Mesmo ícone para o Windows (16 a 256 px)
+│   ├── icone-180.png         Ícone para a tela inicial do celular
 │   └── interface.css         Estilos antigos (o index.html não usa)
 │
 ├── dados/                    Planilhas lidas pelo MAX
@@ -351,6 +355,7 @@ Usada pela página. Cada pessoa é identificada pelo cabeçalho `X-Usuario` (o n
 | GET | `/api/historico` | Últimas 30 mensagens da pessoa |
 | GET | `/api/painel` | Resumo das abas para o quadro "Estoque por aba" |
 | GET | `/relatorios/<arquivo>` | Baixa um plano exportado (só `Plano_Acao_PCP*.xlsx`) |
+| GET | `/favicon.ico`, `/icones/<arquivo>` | Ícones do MAX (`icone.svg`, `icone.ico`, `icone-180.png`) |
 
 Os limites são: perguntas de até 4.000 caracteres, e até 8 perguntas respondidas ao mesmo tempo (`--threads`).
 

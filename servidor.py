@@ -106,6 +106,21 @@ def pagina():
     return Response(html, mimetype="text/html")
 
 
+ICONES = {"icone.svg", "icone.ico", "icone-180.png"}
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return send_from_directory(PAGINA.parent, "icone.ico", max_age=86400)
+
+
+@app.get("/icones/<nome>")
+def icone(nome):
+    if nome not in ICONES:
+        abort(404, description="Arquivo não encontrado.")
+    return send_from_directory(PAGINA.parent, nome, max_age=86400)
+
+
 # ============================================================
 # API USADA PELA PÁGINA
 # ============================================================
