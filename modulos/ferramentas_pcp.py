@@ -26,6 +26,7 @@ from modulos.base_dados import (
     localizar_planilha,
     normalizar,
 )
+from modulos import planilhas
 from modulos.plano_acao import calcular_plano, salvar_plano
 
 
@@ -93,15 +94,24 @@ def _dados_da_aba(nome_aba):
 
 
 def contexto_pcp():
-    """Linha para o prompt do chat com as abas disponíveis."""
+    """Linhas para o prompt do chat com as abas disponíveis."""
     try:
-        return (
-            "Abas de análise disponíveis na planilha: "
+        texto = (
+            "Abas com análise de DOH: "
             + ", ".join(abas_disponiveis())
             + "."
         )
     except Exception as erro:
         return f"A planilha de PCP não pôde ser lida agora: {erro}"
+    try:
+        nomes = [
+            t.nome + (" (oculta)" if t.oculta else "")
+            for t in planilhas.tabelas()
+        ]
+        texto += " Todas as abas que dá para consultar: " + "; ".join(nomes) + "."
+    except Exception as erro:
+        texto += f" As outras abas não puderam ser lidas agora: {erro}"
+    return texto
 
 
 # ============================================================
@@ -433,6 +443,115 @@ def exportar_plano_pcp(aba: str) -> dict:
 
 
 # ============================================================
+# QUALQUER ABA (consultas gerais)
+# ============================================================
+
+def _protegido(funcao, *args):
+    try:
+        return funcao(*args)
+    except Exception as erro:
+        return {"erro": f"Não consegui ler a planilha: {erro}"}
+
+
+def listar_abas_planilha(parte_do_nome: str) -> dict:
+    """Lista as abas das planilhas, com quantas linhas e quais colunas cada uma tem.
+
+    Use para descobrir em qual aba está uma informação e os nomes
+    exatos das colunas antes de usar consultar_aba ou resumir_aba.
+    Inclui as abas ocultas.
+
+    Args:
+        parte_do_nome: Parte do nome da aba para filtrar a lista, por
+            exemplo "compra" ou "vendas". Use "" para listar todas.
+
+    Returns:
+        Lista de abas com nome, linhas, colunas e se está oculta.
+    """
+    _log(f"listando as abas ({parte_do_nome or 'todas'})")
+    catalogo = _protegido(planilhas.catalogo)
+    if isinstance(catalogo, dict):
+        return catalogo
+    filtro = planilhas.normalizar(parte_do_nome)
+    if filtro:
+        catalogo = [a for a in catalogo if filtro in planilhas.normalizar(a["aba"])] or catalogo
+    return {"abas": catalogo}
+
+
+def consultar_aba(aba: str, filtros: str, colunas: str, ordenar_por: str, limite: int) -> dict:
+    """Lê linhas de QUALQUER aba da planilha, com filtros e ordenação.
+
+    Use para qualquer pergunta sobre o conteúdo das abas: solicitações
+    de compra, prioridades, apontamentos, base de vendas, fornecedores,
+    estoque e carteira, insumos, bobinas, as tabelas de análise etc.
+    Não serve para somar ou contar: para isso use resumir_aba.
+
+    Args:
+        aba: Nome da aba, completo ou em parte. Ex.: "solicitações de
+            compra", "apontamentos", "base de vendas", "fiesta".
+        filtros: Condições separadas por ";". Operadores: =, !=, >, >=,
+            <, <=, contém, não contém, começa com, termina com, entre,
+            vazio, não vazio. Datas em dd/mm/aaaa. Maiúsculas e acentos
+            não importam. Ex.: "Status = AGUARDANDO; Quantidade > 100",
+            "Descrição contém COPO 200", "Data entre 01/10/2026 e
+            31/10/2026", "Data de Entrega vazio". Use "" para nenhum.
+        colunas: Colunas a mostrar, separadas por vírgula. Use "" para
+            as primeiras colunas da aba.
+        ordenar_por: Coluna para ordenar, com "desc" no fim para do
+            maior para o menor. Ex.: "Quantidade desc". Use "" para a
+            ordem da planilha.
+        limite: Quantas linhas devolver (máximo 100).
+
+    Returns:
+        Total de linhas encontradas e as linhas pedidas. Em caso de
+        erro, a mensagem e a lista de abas ou colunas válidas.
+    """
+    _log(f"consultando a aba {aba!r} ({filtros or 'sem filtro'})")
+    return _protegido(planilhas.consultar, aba, filtros, colunas, ordenar_por, limite)
+
+
+def resumir_aba(aba: str, filtros: str, agrupar_por: str, calculos: str) -> dict:
+    """Soma, média, contagem, máximo ou mínimo de QUALQUER aba, com ou sem agrupamento.
+
+    Use para totais e rankings: "quanto foi solicitado por fornecedor",
+    "quantas solicitações estão aguardando", "venda de setembro por
+    segmento", "média de estoque", "quantos fornecedores diferentes".
+
+    Args:
+        aba: Nome da aba, completo ou em parte.
+        filtros: Mesmo formato de consultar_aba. Use "" para nenhum.
+        agrupar_por: Coluna(s) para agrupar, separadas por vírgula. Ex.:
+            "Fornecedor" ou "Segmento, Cor". Use "" para o total geral.
+        calculos: Separados por vírgula: "contagem", "soma de <coluna>",
+            "media de <coluna>", "maximo de <coluna>", "minimo de
+            <coluna>", "distintos de <coluna>". Ex.: "soma de
+            Quantidade, contagem".
+
+    Returns:
+        O resultado geral ou um grupo por linha, do maior para o menor
+        no primeiro cálculo.
+    """
+    _log(f"resumindo a aba {aba!r} ({calculos})")
+    return _protegido(planilhas.resumir, aba, filtros, agrupar_por, calculos)
+
+
+def buscar_na_planilha(termo: str) -> dict:
+    """Procura um código, descrição, fornecedor ou qualquer texto em TODAS as abas.
+
+    Use quando o usuário citar um item e não estiver claro em qual aba
+    ele está, ou para juntar tudo o que a planilha tem sobre um código.
+
+    Args:
+        termo: Texto a procurar (parte do código ou da descrição).
+
+    Returns:
+        As abas onde o termo aparece, quantas linhas em cada uma e
+        alguns exemplos.
+    """
+    _log(f"procurando {termo!r} em todas as abas")
+    return _protegido(planilhas.buscar, termo)
+
+
+# ============================================================
 # QUADRO DA INTERFACE (não é ferramenta do Gemini)
 # ============================================================
 
@@ -463,4 +582,8 @@ FERRAMENTAS_PCP = [
     listar_produtos_pcp,
     buscar_produto_pcp,
     exportar_plano_pcp,
+    listar_abas_planilha,
+    consultar_aba,
+    resumir_aba,
+    buscar_na_planilha,
 ]

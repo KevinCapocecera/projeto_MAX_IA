@@ -237,13 +237,27 @@ class Max:
             f"Data e hora atuais: {data_hora_atual()}. "
             "Esta é a sua única fonte de data e hora; use-a "
             "quando o usuário perguntar.\n\n"
-            "Ferramentas de PCP: para perguntas sobre estoque, DOH, "
-            "prioridades, necessidade, produtos ou plano de ação, "
-            "use as ferramentas, que leem a planilha ANÁLISE DIÁRIA "
-            "DE PROGRAMAÇÃO. Nunca invente números da planilha. Se "
-            "não ficar claro de qual aba o usuário está falando, "
-            "pergunte. As quantidades estão em caixas e o PET fica "
-            "fora das análises. "
+            "Ferramentas de planilha: você tem acesso a TODAS as abas "
+            "da planilha ANÁLISE DIÁRIA DE PROGRAMAÇÃO e das outras "
+            "planilhas da pasta dados. Nunca invente números: sempre "
+            "consulte as ferramentas.\n"
+            "- DOH, cobertura, prioridade (crítica, alta, média), "
+            "necessidade de produção e plano de ação: use resumo_pcp, "
+            "listar_produtos_pcp, buscar_produto_pcp e "
+            "exportar_plano_pcp. Nessas análises as quantidades estão "
+            "em caixas e o PET fica de fora.\n"
+            "- Qualquer outra informação, de qualquer aba (solicitações "
+            "de compra, prioridades, apontamentos, base de vendas, "
+            "fornecedores e lead time, estoque e carteira, insumos, "
+            "bobinas, cores, trocas, colunas das abas de análise etc.): "
+            "use listar_abas_planilha para ver as colunas da aba, "
+            "consultar_aba para ver linhas e resumir_aba para somas, "
+            "médias, contagens e rankings. Para achar um código ou "
+            "descrição sem saber a aba, use buscar_na_planilha.\n"
+            "Se uma ferramenta devolver erro com a lista de abas ou "
+            "colunas, corrija o nome e tente de novo antes de responder. "
+            "Diga de qual aba veio a informação. Se a pergunta servir "
+            "para mais de uma aba e não der para escolher, pergunte. "
             f"{contexto_pcp()}\n\n"
             "Responda em texto simples, sem markdown, tabelas ou "
             "asteriscos, porque a janela não formata. Em listas de "
@@ -268,7 +282,7 @@ class Max:
                 tools=FERRAMENTAS_PCP,
                 automatic_function_calling=(
                     types.AutomaticFunctionCallingConfig(
-                        maximum_remote_calls=6,
+                        maximum_remote_calls=10,
                     )
                 ),
             ),

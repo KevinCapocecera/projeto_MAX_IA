@@ -704,8 +704,8 @@
   /* Desempenho: em vez de desenhar 1.224 círculos a cada quadro, cada
      nível de brilho do LED é desenhado uma vez só numa "folha" (atlas)
      e copiado para o painel. Só os pontos que mudaram de brilho são
-     redesenhados, e a animação roda a no máximo 30 quadros por segundo
-     (cai para 15 sozinha em computadores mais fracos). */
+     redesenhados. A animação acompanha a tela até 60 quadros por segundo
+     e cai para 30 sozinha se o computador não der conta. */
   const NIVEIS = 40;          // tons de brilho de cada LED
   let lado = 0;               // tamanho de cada LED, em pixels da tela
   let margem = 0;             // deslocamento à esquerda (hoje sempre 0)
@@ -931,7 +931,7 @@
     }
   }
 
-  let intervalo = 1 / 30;   // segundos entre quadros
+  let intervalo = 1 / 60;   // segundos entre quadros
   let ultimoQuadro = -1;
   let custoMedio = 0;       // milissegundos por quadro (média)
 
@@ -945,8 +945,40 @@
     const comeco = performance.now();
     desenhar(t);
     custoMedio = custoMedio * 0.9 + (performance.now() - comeco) * 0.1;
-    if (custoMedio > 8) intervalo = 1 / 15;        // PC fraco: menos quadros
-    else if (custoMedio < 3) intervalo = 1 / 30;
+    if (custoMedio > 10) intervalo = 1 / 30;       // PC fraco: menos quadros
+    else if (custoMedio < 4) intervalo = 1 / 60;
+    medir(comeco);
+  }
+
+  /* Medidor de desempenho: abra a página com ?fps no fim do endereço
+     (ex.: http://nome-do-pc:8000/?fps) para ver quadros por segundo e
+     quanto tempo cada quadro leva para desenhar. */
+  const MEDIDOR = /[?&]fps\b/.test(location.search);
+  const caixaMedidor = MEDIDOR ? document.createElement("div") : null;
+  if (caixaMedidor) {
+    caixaMedidor.style.cssText =
+      "position:fixed;left:8px;bottom:8px;z-index:20;padding:6px 10px;border-radius:6px;" +
+      "background:#000c;color:#0f0;font:12px/1.4 monospace;pointer-events:none;white-space:pre";
+    document.body.append(caixaMedidor);
+  }
+  let medidas = { quadros: 0, desde: performance.now(), pior: 0, rafs: 0, intervaloMax: 0, ultimoRaf: 0 };
+  window.__medidor = () => ({ ...medidas, custoMedio, intervalo });
+  function medir(comeco) {
+    if (!MEDIDOR && !window.__medindo) return;
+    const fim = performance.now();
+    medidas.quadros++;
+    medidas.pior = Math.max(medidas.pior, fim - comeco);
+    if (fim - medidas.desde >= 1000) {
+      const fps = (medidas.quadros * 1000) / (fim - medidas.desde);
+      const texto =
+        `${fps.toFixed(0)} quadros/s  (alvo ${Math.round(1 / intervalo)})\n` +
+        `desenho: média ${custoMedio.toFixed(1)} ms, pior ${medidas.pior.toFixed(1)} ms\n` +
+        `tela: ${Math.round(screen.width * devicePixelRatio)}x${Math.round(screen.height * devicePixelRatio)} px, ` +
+        `zoom ${devicePixelRatio}`;
+      if (caixaMedidor) caixaMedidor.textContent = texto;
+      window.__ultimaMedida = { fps, custoMedio, pior: medidas.pior, alvo: 1 / intervalo };
+      medidas.quadros = 0; medidas.pior = 0; medidas.desde = fim;
+    }
   }
 
   /* ============================================================
