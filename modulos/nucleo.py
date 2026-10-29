@@ -10,11 +10,13 @@ import json
 import logging
 import os
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
 from google import genai
+from google.genai import errors as erros_genai
 from google.genai import types
 
 from modulos import ferramentas_pcp
@@ -36,7 +38,37 @@ ARQUIVO_MEMORIA = BASE_DIR / "memoria.json"
 
 load_dotenv(BASE_DIR / ".env")
 
-MODELO = "gemini-3.5-flash-lite"
+# Os modelos podem ser trocados no .env, sem mexer no código:
+#   GEMINI_MODELO=gemini-3.5-flash-lite
+#   GEMINI_MODELO_RESERVA=gemini-3.5-flash   (vazio = sem reserva)
+MODELO = os.getenv("GEMINI_MODELO", "").strip() or "gemini-3.5-flash-lite"
+MODELO_RESERVA = os.getenv("GEMINI_MODELO_RESERVA", "gemini-3.5-flash").strip()
+
+# Erros passageiros do Google: modelo sobrecarregado (503), limite por
+# minuto (429) e falhas internas (500, 502, 504). Nesses casos o MAX
+# espera um pouco e tenta de novo; se não der, tenta o modelo reserva.
+CODIGOS_PASSAGEIROS = {429, 500, 502, 503, 504}
+ESPERAS_MODELO = (0, 2, 5)    # segundos antes de cada tentativa no modelo principal
+ESPERAS_RESERVA = (0, 3)      # e no modelo reserva
+
+
+class GeminiIndisponivel(RuntimeError):
+    """O Gemini não respondeu depois de todas as tentativas."""
+
+
+def _mensagem_indisponivel(erro):
+    codigo = getattr(erro, "code", None)
+    if codigo == 429:
+        return (
+            "O limite de uso do Gemini foi atingido por enquanto (erro 429 "
+            "do Google). Espere um minuto e pergunte de novo. Se continuar, "
+            "a cota do dia pode ter acabado."
+        )
+    return (
+        f"O Gemini está sobrecarregado agora (erro {codigo} do Google). "
+        "Tentei algumas vezes, inclusive com o modelo reserva, sem sucesso. "
+        "Isso costuma passar rápido: pergunte de novo em um minuto."
+    )
 
 INSTRUCOES = (
     "Seu nome é MAX. Você é um assistente pessoal "
@@ -172,7 +204,7 @@ class Max:
             recente = [item.copy() for item in self.historico[-12:]]
             memoria = [item.copy() for item in self.memoria]
 
-        _log(f"Chamando modelo {MODELO}...")
+        _log(f"Chamando o Gemini ({MODELO})...")
         _atual.max = self
         try:
             texto = self._consultar_gemini(recente, memoria)
@@ -198,6 +230,38 @@ class Max:
         ).start()
 
         return texto
+
+    def _gerar(self, **parametros):
+        """generate_content com novas tentativas e modelo reserva.
+
+        Só repete nos erros passageiros do Google (CODIGOS_PASSAGEIROS);
+        os outros (chave inválida, pedido malformado...) aparecem na hora.
+        """
+        planos = [(MODELO, ESPERAS_MODELO)]
+        if MODELO_RESERVA and MODELO_RESERVA != MODELO:
+            planos.append((MODELO_RESERVA, ESPERAS_RESERVA))
+
+        ultimo_erro = None
+        for modelo, esperas in planos:
+            for tentativa, espera in enumerate(esperas, start=1):
+                if espera:
+                    time.sleep(espera)
+                try:
+                    resposta = self.client.models.generate_content(
+                        model=modelo, **parametros
+                    )
+                    if modelo != MODELO:
+                        _log(f"Respondido pelo modelo reserva ({modelo}).")
+                    return resposta
+                except erros_genai.APIError as erro:
+                    if getattr(erro, "code", None) not in CODIGOS_PASSAGEIROS:
+                        raise
+                    ultimo_erro = erro
+                    _log(
+                        f"{modelo} indisponível (erro {erro.code}), "
+                        f"tentativa {tentativa} de {len(esperas)}."
+                    )
+        raise GeminiIndisponivel(_mensagem_indisponivel(ultimo_erro)) from ultimo_erro
 
     def _consultar_gemini(self, recente, memoria):
         pergunta_atual = next(
@@ -283,8 +347,7 @@ class Max:
         # As ferramentas de PCP vão junto na consulta: o Gemini decide
         # se precisa delas e o SDK executa as funções Python sozinho
         # (function calling automático).
-        resposta = self.client.models.generate_content(
-            model=MODELO,
+        resposta = self._gerar(
             contents=entrada,
             config=types.GenerateContentConfig(
                 tools=FERRAMENTAS_PCP,

@@ -36,6 +36,49 @@ PASTA_RELATORIOS = PASTA / "relatorios"
 
 LIMITE_MENSAGEM = 4000  # caracteres por pergunta
 
+# Quantas perguntas o MAX responde ao mesmo tempo. Cada uma fica presa
+# esperando o Gemini (alguns segundos), por isso o limite é separado das
+# chamadas rápidas da página (LED, quadro, histórico), que ganham
+# VAGAS_RAPIDAS linhas de atendimento só para elas e nunca ficam na fila.
+# Mude no .env com MAX_SIMULTANEAS=50, ou com --simultaneas 50.
+SIMULTANEAS_PADRAO = 32
+VAGAS_RAPIDAS = 8
+ESPERA_NA_FILA = 90  # segundos que uma pergunta espera por uma vaga
+
+
+def _simultaneas_do_env():
+    try:
+        return max(1, int(os.getenv("MAX_SIMULTANEAS", SIMULTANEAS_PADRAO)))
+    except ValueError:
+        return SIMULTANEAS_PADRAO
+
+
+_vagas = threading.BoundedSemaphore(_simultaneas_do_env())
+
+# Fila: perguntas que chegam com todas as vagas ocupadas esperam aqui. Cada
+# uma também prende uma linha de atendimento, então a fila tem tamanho
+# máximo (igual ao número de vagas) e linhas próprias, separadas das
+# VAGAS_RAPIDAS. Com a fila cheia, a resposta é imediata ("tente de novo").
+_fila_maxima = _simultaneas_do_env()
+_na_fila = 0
+_trava_fila = threading.Lock()
+
+
+def _ocupar_vaga():
+    """Pega uma vaga para responder; espera na fila se precisar."""
+    global _na_fila
+    if _vagas.acquire(blocking=False):
+        return True
+    with _trava_fila:
+        if _na_fila >= _fila_maxima:
+            return False
+        _na_fila += 1
+    try:
+        return _vagas.acquire(timeout=ESPERA_NA_FILA)
+    finally:
+        with _trava_fila:
+            _na_fila -= 1
+
 app = Flask(__name__)
 
 
@@ -137,6 +180,13 @@ def perguntar():
 
     max_ = _assistente(nome, ident)
     _estados[ident] = "pensando"
+    if not _ocupar_vaga():
+        _estados.pop(ident, None)
+        print(f"[MAX] Fila cheia: {nome} não conseguiu vaga.", flush=True)
+        return jsonify({"erro": (
+            "O MAX está respondendo muitas perguntas ao mesmo tempo. "
+            "Tente de novo em alguns segundos."
+        )}), 503
     ferramentas_pcp.comecar_registro_exportacoes()
     try:
         resposta = max_.responder(texto)
@@ -144,6 +194,7 @@ def perguntar():
         print(f"[MAX] Erro para {nome}: {erro!r}", flush=True)
         return jsonify({"erro": str(erro)}), 500
     finally:
+        _vagas.release()
         _estados.pop(ident, None)
 
     arquivos = [
@@ -215,9 +266,16 @@ def _manter_acordado():
 def main():
     parser = argparse.ArgumentParser(description="MAX na rede da empresa")
     parser.add_argument("--porta", type=int, default=8000)
-    parser.add_argument("--threads", type=int, default=8,
-                        help="quantas perguntas podem ser respondidas ao mesmo tempo")
+    parser.add_argument("--simultaneas", "--threads", type=int, default=_simultaneas_do_env(),
+                        help="quantas perguntas podem ser respondidas ao mesmo tempo "
+                             f"(padrão: MAX_SIMULTANEAS do .env ou {SIMULTANEAS_PADRAO})")
     args = parser.parse_args()
+
+    global _vagas, _fila_maxima
+    simultaneas = max(1, args.simultaneas)
+    _vagas = threading.BoundedSemaphore(simultaneas)
+    _fila_maxima = simultaneas
+    linhas = simultaneas + _fila_maxima + VAGAS_RAPIDAS
 
     if not PAGINA.exists():
         raise SystemExit(f"Não encontrei a interface em {PAGINA}.")
@@ -232,10 +290,17 @@ def main():
     print("  (o endereço com o nome do PC continua valendo se o IP mudar)")
     if _manter_acordado():
         print("O computador não vai suspender enquanto esta janela estiver aberta.")
+    print(f"Até {simultaneas} perguntas ao mesmo tempo (mude com MAX_SIMULTANEAS no .env).")
     print("Para desligar, feche esta janela ou aperte Ctrl+C.\n", flush=True)
 
     from waitress import serve
-    serve(app, host="0.0.0.0", port=args.porta, threads=args.threads)
+    serve(
+        app,
+        host="0.0.0.0",
+        port=args.porta,
+        threads=linhas,
+        connection_limit=max(100, linhas * 4),
+    )
 
 
 if __name__ == "__main__":

@@ -100,7 +100,16 @@ Crie o arquivo **`.env`** na pasta do projeto:
 
 ```
 GEMINI_API_KEY=sua_chave_aqui
+
+# Opcional: troca os modelos sem mexer no código
+GEMINI_MODELO=gemini-3.5-flash-lite
+GEMINI_MODELO_RESERVA=gemini-3.5-flash
+
+# Opcional: quantas perguntas o site responde ao mesmo tempo (padrão 32)
+MAX_SIMULTANEAS=32
 ```
+
+Quando o Google devolve um erro passageiro (503 de modelo sobrecarregado, 429 de limite por minuto, 500, 502 ou 504), o MAX faz até 3 tentativas no modelo principal, esperando 2 e depois 5 segundos entre elas. Se não der, faz mais 2 tentativas no **modelo reserva**. Só depois disso ele mostra uma mensagem explicando o problema. Para não usar o modelo reserva, deixe `GEMINI_MODELO_RESERVA=` vazio.
 
 O `.env` está no `.gitignore` e **nunca** deve ir para o GitHub.
 
@@ -357,7 +366,13 @@ Usada pela página. Cada pessoa é identificada pelo cabeçalho `X-Usuario` (o n
 | GET | `/relatorios/<arquivo>` | Baixa um plano exportado (só `Plano_Acao_PCP*.xlsx`) |
 | GET | `/favicon.ico`, `/icones/<arquivo>` | Ícones do MAX (`icone.svg`, `icone.ico`, `icone-180.png`) |
 
-Os limites são: perguntas de até 4.000 caracteres, e até 8 perguntas respondidas ao mesmo tempo (`--threads`).
+**Limites:**
+
+- **Tamanho da pergunta:** até 4.000 caracteres.
+- **Perguntas ao mesmo tempo:** até **32** (`MAX_SIMULTANEAS` no `.env`, ou `--simultaneas 50` ao ligar).
+- **Fila:** as perguntas que chegam com tudo ocupado esperam numa fila do mesmo tamanho, por até 90 s. Com a fila cheia, a pessoa recebe na hora a mensagem "O MAX está respondendo muitas perguntas ao mesmo tempo. Tente de novo em alguns segundos."
+- **Página:** o servidor reserva 8 linhas de atendimento só para as chamadas rápidas (página, LED, quadro e histórico). Assim a página continua respondendo mesmo com tudo ocupado.
+- **Limite do Gemini:** a chave também tem um limite de pedidos por minuto, definido pelo Google conforme o plano. Se ele for atingido, o MAX tenta de novo e usa o modelo reserva (erro 429).
 
 ---
 
@@ -384,6 +399,8 @@ O teste de perguntas gasta um pouco da cota do Gemini. Ele não mexe no históri
 |---|---|
 | `iniciar_servidor.bat` diz "O sistema não pode encontrar o caminho especificado" | O `.bat` foi aberto fora da pasta do projeto, ou a `.venv` não existe. Abra o `.bat` de dentro de `projeto_MAX_IA`. |
 | Funciona no `localhost`, mas os colegas não conseguem abrir | Firewall ou rede marcada como "Pública" no Windows. Veja o [LEIA-ME_SERVIDOR.md](LEIA-ME_SERVIDOR.md). |
+| "O Gemini está sobrecarregado agora (erro 503 do Google)" | O modelo do Google está com muita procura. O MAX já tentou de novo e usou o modelo reserva. Costuma passar em minutos: pergunte de novo. |
+| "O limite de uso do Gemini foi atingido (erro 429)" | Muitas perguntas por minuto, ou a cota do dia acabou. Espere um pouco. Se acontecer sempre, veja a cota no Google AI Studio. |
 | "Não encontrei GEMINI_API_KEY no arquivo .env" | Crie o `.env` na raiz do projeto com `GEMINI_API_KEY=...`. |
 | "Coloque a planilha ANÁLISE DIÁRIA DE PROGRAMAÇÃO na pasta dados" | O nome do arquivo precisa ser exatamente esse, com os acentos, em `.xlsm` ou `.xlsx`. |
 | O MAX não vê uma mudança recente na planilha | Salve a planilha no Excel. O MAX lê a última versão salva. |
