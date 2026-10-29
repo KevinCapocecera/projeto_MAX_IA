@@ -26,5 +26,9 @@
   {
     "categoria": "usuario",
     "conteudo": "O usuario se chama Kevin e e o criador do MAX"
+  },
+  {
+    "categoria": "projeto",
+    "conteudo": "Na planilha de solicitacao de compra do Protheus, a aba Analise Itens de Compra contem a coluna de Analise com o status Comprar para identificar itens que precisam ser adquiridos"
   }
 ]

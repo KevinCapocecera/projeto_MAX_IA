@@ -115,6 +115,9 @@
   .app {
     height: 100%;
     display: grid;
+    /* minmax(0, 1fr): nada (letreiro, lista de abas) alarga a página
+       além da tela no celular. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
@@ -443,6 +446,48 @@
   @media (prefers-reduced-motion: reduce) {
     .conversa { scroll-behavior: auto; }
   }
+
+  /* ============================================================
+     SERVIDOR NA REDE: entrada com o nome e arquivos para baixar
+     ============================================================ */
+  .selo-usuario { background: transparent; cursor: pointer; font: inherit;
+    font-family: var(--fonte-estreita); font-size: 0.875rem; }
+  .selo-usuario:hover { border-color: var(--texto-suave); color: var(--texto); }
+
+  .entrar {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center; padding: 16px;
+    background: color-mix(in srgb, var(--aco) 88%, transparent);
+    backdrop-filter: blur(4px);
+  }
+  .entrar[hidden] { display: none; }
+  .entrar-caixa {
+    width: min(380px, 100%);
+    display: grid; gap: 12px;
+    padding: 24px;
+    background: var(--painel);
+    border: 1px solid var(--linha);
+    border-radius: 12px;
+    color: var(--texto);
+    font-family: var(--fonte);
+  }
+  .entrar-caixa h2 { margin: 0; font-size: 1.25rem; }
+  .entrar-caixa p { margin: 0; color: var(--texto-suave); }
+  .entrar-caixa input {
+    font: inherit; font-size: 1rem; padding: 10px 12px;
+    border: 1px solid var(--linha); border-radius: 8px;
+    background: var(--bolha); color: var(--texto);
+  }
+  .entrar-caixa input:focus { outline: 2px solid var(--led); outline-offset: 1px; }
+
+  .msg-arquivos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .msg-arquivos a {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 8px;
+    background: var(--led); color: var(--sobre-led);
+    text-decoration: none; font-family: var(--fonte-estreita);
+  }
+  .msg-arquivos a:hover { filter: brightness(1.08); }
 </style>
 </head>
 <body>
@@ -455,6 +500,8 @@
       <span class="selo selo-demo" id="selo-demo"
             title="As respostas são simuladas até a interface ser ligada ao Python">Demonstração</span>
       <span class="selo" id="selo-planilha">Planilha de exemplo</span>
+      <button class="selo selo-usuario" id="selo-usuario" type="button" hidden
+              title="Trocar de usuário"></button>
       <button class="botao-icone" id="botao-tema" type="button" aria-label="Mudar o tema">
         <svg id="icone-tema" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
@@ -517,6 +564,16 @@
 
 </div>
 
+<div class="entrar" id="entrar" hidden>
+  <form class="entrar-caixa" id="form-entrar">
+    <h2>Bem-vindo ao MAX</h2>
+    <p>Digite seu nome. Ele separa o seu histórico de conversa do das outras pessoas.</p>
+    <input id="nome-usuario" type="text" maxlength="60" autocomplete="name"
+           placeholder="Seu nome" aria-label="Seu nome" required>
+    <button class="enviar" type="submit">Entrar</button>
+  </form>
+</div>
+
 <script>
 (() => {
   "use strict";
@@ -545,8 +602,48 @@
     window.addEventListener("pywebviewready", () => ok(apiCompleta()), { once: true });
   });
 
+  /* ============================================================
+     SERVIDOR NA REDE (servidor.py)
+     O servidor marca window.MAX_SERVIDOR. Cada pessoa entra com o
+     nome, que vai em todas as chamadas (cabeçalho X-Usuario).
+     ============================================================ */
+  const NO_SERVIDOR = window.MAX_SERVIDOR === true;
+  let usuario = "";
+  try { usuario = localStorage.getItem("max-usuario") || ""; } catch (erro) { /* sem armazenamento */ }
+
+  async function chamar(caminho, corpo) {
+    const opcoes = { headers: { "X-Usuario": encodeURIComponent(usuario) } };
+    if (corpo !== undefined) {
+      opcoes.method = "POST";
+      opcoes.headers["Content-Type"] = "application/json";
+      opcoes.body = JSON.stringify(corpo);
+    }
+    let resposta;
+    try {
+      resposta = await fetch(caminho, opcoes);
+    } catch (erro) {
+      throw new Error("Não consegui falar com o servidor do MAX. Ele está ligado?");
+    }
+    const dados = await resposta.json().catch(() => ({}));
+    if (!resposta.ok || dados.erro) throw new Error(dados.erro || `Erro ${resposta.status}`);
+    return dados;
+  }
+
+  const apiServidor = {
+    perguntar: (texto) => chamar("/api/perguntar", { texto }),
+    painel: () => chamar("/api/painel"),
+    estado: () => chamar("/api/estado"),
+    historico: () => chamar("/api/historico"),
+  };
+
+  const apiAtual = () => (NO_SERVIDOR ? (usuario ? apiServidor : null) : apiCompleta());
+
   /* Devolve a ponte com o Python, ou null no modo demonstração. */
   async function obterApi() {
+    if (NO_SERVIDOR) {
+      if (!usuario) throw new Error("Digite seu nome para começar.");
+      return apiServidor;
+    }
     if (apiCompleta()) return apiCompleta();
     if (!NO_PROGRAMA && !window.pywebview) return null;
     const limite = new Promise((_, falha) => setTimeout(
@@ -604,7 +701,16 @@
 
   const canvas = $("matriz");
   const ctx = canvas.getContext("2d");
-  let celula = 10;
+  /* Desempenho: em vez de desenhar 1.224 círculos a cada quadro, cada
+     nível de brilho do LED é desenhado uma vez só numa "folha" (atlas)
+     e copiado para o painel. Só os pontos que mudaram de brilho são
+     redesenhados. A animação acompanha a tela até 60 quadros por segundo
+     e cai para 30 sozinha se o computador não der conta. */
+  const NIVEIS = 40;          // tons de brilho de cada LED
+  let lado = 0;               // tamanho de cada LED, em pixels da tela
+  let margem = 0;             // deslocamento à esquerda (hoje sempre 0)
+  let atlas = null;
+  const desenhados = new Int16Array(COLUNAS * LINHAS).fill(-1);
   let cores = { led: [255, 176, 58], apagado: [47, 46, 43], critica: [255, 93, 78] };
 
   function hexParaRgb(hex) {
@@ -621,18 +727,54 @@
       apagado: hexParaRgb(estilo.getPropertyValue("--led-apagado")),
       critica: hexParaRgb(estilo.getPropertyValue("--critica")),
     };
+    prepararAtlas();
+  }
+
+  /* Desenha uma vez cada nível de brilho: linha 0 na cor do LED,
+     linha 1 na cor de erro. */
+  function prepararAtlas() {
+    if (!lado) return;
+    atlas = document.createElement("canvas");
+    atlas.width = lado * NIVEIS;
+    atlas.height = lado * 2;
+    const a = atlas.getContext("2d");
+    const raio = lado * 0.3;
+    const [ar, ag, ab] = cores.apagado;
+    [cores.led, cores.critica].forEach(([lr, lg, lb], linha) => {
+      for (let n = 0; n < NIVEIS; n++) {
+        const i = n / (NIVEIS - 1);
+        const cx = n * lado + lado / 2;
+        const cy = linha * lado + lado / 2;
+        if (i > 0.7) {
+          a.fillStyle = `rgba(${lr},${lg},${lb},${(i - 0.7) * 0.55})`;
+          a.beginPath();
+          a.arc(cx, cy, Math.min(raio * 1.9, lado / 2), 0, Math.PI * 2);
+          a.fill();
+        }
+        const r = Math.round(ar + (lr - ar) * i);
+        const g = Math.round(ag + (lg - ag) * i);
+        const b = Math.round(ab + (lb - ab) * i);
+        a.fillStyle = `rgb(${r},${g},${b})`;
+        a.beginPath();
+        a.arc(cx, cy, raio * (0.85 + 0.25 * i), 0, Math.PI * 2);
+        a.fill();
+      }
+    });
+    desenhados.fill(-1);  // força redesenhar tudo com as cores novas
   }
 
   function dimensionar() {
     const largura = canvas.clientWidth;
     if (!largura) return;
-    celula = largura / COLUNAS;
-    const altura = celula * LINHAS;
+    // Cada LED ocupa um número inteiro de pixels (sem emendas entre
+    // eles); o navegador ajusta o painel à largura disponível.
     const dpr = window.devicePixelRatio || 1;
-    canvas.style.height = altura + "px";
-    canvas.width = Math.round(largura * dpr);
-    canvas.height = Math.round(altura * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    lado = Math.max(2, Math.round((largura * dpr) / COLUNAS));
+    margem = 0;
+    canvas.width = lado * COLUNAS;
+    canvas.height = lado * LINHAS;
+    canvas.style.height = (largura * LINHAS) / COLUNAS + "px";
+    prepararAtlas();
     if (reduzirMovimento) desenhar(1);
   }
 
@@ -770,41 +912,73 @@
   }
 
   function desenhar(t) {
-    const largura = canvas.clientWidth;
-    const altura = celula * LINHAS;
-    ctx.clearRect(0, 0, largura, altura);
-    const raio = celula * 0.3;
-    const aceso = estado === "erro" ? cores.critica : cores.led;
-    const [ar, ag, ab] = cores.apagado;
-    const [lr, lg, lb] = aceso;
+    if (!atlas) return;
+    const linhaCor = estado === "erro" ? 1 : 0;
+    const base = linhaCor * NIVEIS;
 
     for (let y = 0; y < LINHAS; y++) {
       for (let x = 0; x < COLUNAS; x++) {
         const i = Math.max(0, Math.min(1, intensidade(x, y, t)));
-        const cx = (x + 0.5) * celula;
-        const cy = (y + 0.5) * celula;
-        if (i > 0.7) {
-          ctx.fillStyle = `rgba(${lr},${lg},${lb},${(i - 0.7) * 0.55})`;
-          ctx.beginPath();
-          ctx.arc(cx, cy, raio * 1.9, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        const r = Math.round(ar + (lr - ar) * i);
-        const g = Math.round(ag + (lg - ag) * i);
-        const b = Math.round(ab + (lb - ab) * i);
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
-        ctx.beginPath();
-        ctx.arc(cx, cy, raio * (0.85 + 0.25 * i), 0, Math.PI * 2);
-        ctx.fill();
+        const nivel = Math.round(i * (NIVEIS - 1));
+        const k = y * COLUNAS + x;
+        if (desenhados[k] === base + nivel) continue;  // não mudou
+        desenhados[k] = base + nivel;
+        const px = margem + x * lado;
+        const py = y * lado;
+        ctx.clearRect(px, py, lado, lado);
+        ctx.drawImage(atlas, nivel * lado, linhaCor * lado, lado, lado, px, py, lado, lado);
       }
     }
   }
 
+  let intervalo = 1 / 60;   // segundos entre quadros
+  let ultimoQuadro = -1;
+  let custoMedio = 0;       // milissegundos por quadro (média)
+
   function quadro() {
-    const t = agora();
-    if (estado === "inicio" && t > 2.6) definirEstado("pronto");
-    desenhar(t);
     requestAnimationFrame(quadro);
+    const t = agora();
+    if (t - ultimoQuadro < intervalo - 0.004) return;
+    ultimoQuadro = t;
+    if (estado === "inicio" && t > 2.6) definirEstado("pronto");
+
+    const comeco = performance.now();
+    desenhar(t);
+    custoMedio = custoMedio * 0.9 + (performance.now() - comeco) * 0.1;
+    if (custoMedio > 10) intervalo = 1 / 30;       // PC fraco: menos quadros
+    else if (custoMedio < 4) intervalo = 1 / 60;
+    medir(comeco);
+  }
+
+  /* Medidor de desempenho: abra a página com ?fps no fim do endereço
+     (ex.: http://nome-do-pc:8000/?fps) para ver quadros por segundo e
+     quanto tempo cada quadro leva para desenhar. */
+  const MEDIDOR = /[?&]fps\b/.test(location.search);
+  const caixaMedidor = MEDIDOR ? document.createElement("div") : null;
+  if (caixaMedidor) {
+    caixaMedidor.style.cssText =
+      "position:fixed;left:8px;bottom:8px;z-index:20;padding:6px 10px;border-radius:6px;" +
+      "background:#000c;color:#0f0;font:12px/1.4 monospace;pointer-events:none;white-space:pre";
+    document.body.append(caixaMedidor);
+  }
+  let medidas = { quadros: 0, desde: performance.now(), pior: 0, rafs: 0, intervaloMax: 0, ultimoRaf: 0 };
+  window.__medidor = () => ({ ...medidas, custoMedio, intervalo });
+  function medir(comeco) {
+    if (!MEDIDOR && !window.__medindo) return;
+    const fim = performance.now();
+    medidas.quadros++;
+    medidas.pior = Math.max(medidas.pior, fim - comeco);
+    if (fim - medidas.desde >= 1000) {
+      const fps = (medidas.quadros * 1000) / (fim - medidas.desde);
+      const texto =
+        `${fps.toFixed(0)} quadros/s  (alvo ${Math.round(1 / intervalo)})\n` +
+        `desenho: média ${custoMedio.toFixed(1)} ms, pior ${medidas.pior.toFixed(1)} ms\n` +
+        `tela: ${Math.round(screen.width * devicePixelRatio)}x${Math.round(screen.height * devicePixelRatio)} px, ` +
+        `zoom ${devicePixelRatio}`;
+      if (caixaMedidor) caixaMedidor.textContent = texto;
+      window.__ultimaMedida = { fps, custoMedio, pior: medidas.pior, alvo: 1 / intervalo };
+      medidas.quadros = 0; medidas.pior = 0; medidas.desde = fim;
+    }
   }
 
   /* ============================================================
@@ -910,6 +1084,23 @@
     msg.append(cabecalho, corpo);
     mensagens.append(msg);
     conversa.scrollTop = conversa.scrollHeight;
+    return msg;
+  }
+
+  /* Botões para baixar os planos exportados nesta resposta. */
+  function adicionarArquivos(msg, arquivos) {
+    if (!msg || !arquivos || !arquivos.length) return;
+    const caixa = document.createElement("div");
+    caixa.className = "msg-arquivos";
+    for (const arquivo of arquivos) {
+      const link = document.createElement("a");
+      link.href = arquivo.url;
+      link.download = arquivo.nome;
+      link.textContent = `Baixar ${arquivo.nome}`;
+      caixa.append(link);
+    }
+    msg.append(caixa);
+    conversa.scrollTop = conversa.scrollHeight;
   }
 
   function ajustarAltura() {
@@ -932,13 +1123,26 @@
     clearTimeout(voltaParaPronto);
     definirEstado("pensando");
 
+    /* No servidor, pergunta a cada meio segundo se o MAX está lendo
+       a planilha, para acender o "consultando" no painel de LED. */
+    let acompanhar = null;
     try {
       const api = await obterApi();
+      if (api === apiServidor) {
+        acompanhar = setInterval(async () => {
+          try {
+            const { estado } = await apiServidor.estado();
+            if (estado === "consultando" && ocupada) definirEstado("consultando");
+          } catch (erro) { /* só o LED; ignora */ }
+        }, 500);
+      }
       const resposta = api ? await api.perguntar(texto) : await demonstracao(texto);
+      clearInterval(acompanhar);
       if (api) atualizarPainel();
       const textoResposta = (resposta && resposta.texto) || "Não recebi uma resposta em texto.";
       definirEstado("falando");
-      adicionarMensagem("assistente", textoResposta);
+      const msg = adicionarMensagem("assistente", textoResposta);
+      adicionarArquivos(msg, resposta && resposta.arquivos);
       voltarParaPronto(Math.min(4500, 700 + textoResposta.length * 15));
     } catch (erro) {
       definirEstado("erro");
@@ -949,6 +1153,7 @@
       );
       voltarParaPronto(1600);
     } finally {
+      clearInterval(acompanhar);
       ocupada = false;
       botaoEnviar.disabled = false;
       entrada.focus();
@@ -1054,7 +1259,7 @@
      ============================================================ */
   window.assistente = { estado: definirEstado };
 
-  if (NO_PROGRAMA) {
+  if (NO_PROGRAMA || NO_SERVIDOR) {
     $("selo-demo").hidden = true;
     $("selo-planilha").textContent = "Lendo a planilha…";
     $("andon-fonte").textContent = "Lendo a planilha…";
@@ -1093,7 +1298,7 @@
   /* Quadro com os dados reais (relido a cada resposta e a cada 2 minutos;
      o Python só lê a planilha de novo se o arquivo tiver sido salvo). */
   async function atualizarPainel() {
-    const api = apiCompleta();
+    const api = apiAtual();
     if (!api) return;
     try {
       const dados = await api.painel();
@@ -1105,8 +1310,59 @@
     }
   }
 
+  /* ---------- Entrada com o nome (só no servidor) ---------- */
+  async function carregarConversa() {
+    mensagens.replaceChildren();
+    $("vazio").hidden = false;
+    try {
+      const { mensagens: antigas } = await apiServidor.historico();
+      for (const item of antigas || []) {
+        adicionarMensagem(item.role === "user" ? "voce" : "assistente", item.content);
+      }
+    } catch (erro) { /* começa com a conversa vazia */ }
+  }
+
+  function mostrarUsuario() {
+    const selo = $("selo-usuario");
+    selo.textContent = usuario;
+    selo.hidden = !usuario;
+    selo.setAttribute("aria-label", `Usuário: ${usuario}. Clique para trocar.`);
+  }
+
+  function pedirNome() {
+    $("nome-usuario").value = usuario;
+    $("entrar").hidden = false;
+    $("nome-usuario").focus();
+  }
+
+  let servidorIniciado = false;
+  function entrarNoServidor() {
+    mostrarUsuario();
+    carregarConversa();
+    atualizarPainel();
+    if (!servidorIniciado) {
+      servidorIniciado = true;
+      setInterval(atualizarPainel, 120000);
+    }
+    entrada.focus();
+  }
+
+  if (NO_SERVIDOR) {
+    $("form-entrar").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const nome = $("nome-usuario").value.trim().replace(/\s+/g, " ");
+      if (!nome) return;
+      usuario = nome;
+      try { localStorage.setItem("max-usuario", nome); } catch (erro) { /* sem armazenamento */ }
+      $("entrar").hidden = true;
+      entrarNoServidor();
+    });
+    $("selo-usuario").addEventListener("click", pedirNome);
+    if (usuario) entrarNoServidor(); else pedirNome();
+  }
+
   apiPronta.then((api) => {
-    if (!api) return;
+    if (!api || NO_SERVIDOR) return;
     $("selo-demo").hidden = true;
     atualizarPainel();
     setInterval(atualizarPainel, 120000);

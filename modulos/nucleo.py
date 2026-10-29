@@ -96,9 +96,26 @@ def buscar_memorias(pergunta, memorias, limite=5):
 # CLASSE PRINCIPAL
 # ============================================================
 
+# Qual Max está respondendo nesta thread. As ferramentas de PCP avisam
+# todos os Max registrados quando leem a planilha; com várias pessoas
+# usando o servidor ao mesmo tempo, só quem fez a pergunta deve reagir.
+_atual = threading.local()
+
+
 class Max:
 
-    def __init__(self):
+    def __init__(self, pasta=None, nome_usuario=None, modo_web=False):
+        """pasta: onde ficam historico.json e memoria.json desta pessoa
+        (padrão: a pasta do projeto, como na versão de uma pessoa só).
+        nome_usuario: nome de quem está conversando (vai para o prompt).
+        modo_web: True quando o MAX roda no servidor (servidor.py)."""
+        pasta = Path(pasta) if pasta else BASE_DIR
+        pasta.mkdir(parents=True, exist_ok=True)
+        self.arquivo_historico = pasta / "historico.json"
+        self.arquivo_memoria = pasta / "memoria.json"
+        self.nome_usuario = nome_usuario
+        self.modo_web = modo_web
+
         chave = os.getenv("GEMINI_API_KEY")
         self.client = (
             genai.Client(
@@ -127,6 +144,8 @@ class Max:
         return self.client is not None
 
     def _avisar_consulta(self, descricao):
+        if getattr(_atual, "max", None) is not self:
+            return
         if self.ao_mudar_estado is not None:
             self.ao_mudar_estado("consultando")
 
@@ -154,11 +173,14 @@ class Max:
             memoria = [item.copy() for item in self.memoria]
 
         _log(f"Chamando modelo {MODELO}...")
+        _atual.max = self
         try:
             texto = self._consultar_gemini(recente, memoria)
         except Exception as erro:
             _log(f"ERRO: {erro!r}")
             raise
+        finally:
+            _atual.max = None
         _log("Resposta recebida!")
 
         with self._trava:
@@ -198,18 +220,44 @@ class Max:
             for item in recente
         )
 
+        extras = ""
+        if self.nome_usuario:
+            extras += f"Você está conversando com {self.nome_usuario}. "
+        if self.modo_web:
+            extras += (
+                "Você roda num servidor da empresa e cada pessoa abre "
+                "pelo navegador. Quando exportar um plano de ação, não "
+                "cite o caminho do arquivo: diga que o botão para baixar "
+                "aparece logo abaixo da resposta. "
+            )
+
         entrada = (
             f"{INSTRUCOES}\n\n"
+            f"{extras + chr(10) + chr(10) if extras else ''}"
             f"Data e hora atuais: {data_hora_atual()}. "
             "Esta é a sua única fonte de data e hora; use-a "
             "quando o usuário perguntar.\n\n"
-            "Ferramentas de PCP: para perguntas sobre estoque, DOH, "
-            "prioridades, necessidade, produtos ou plano de ação, "
-            "use as ferramentas, que leem a planilha ANÁLISE DIÁRIA "
-            "DE PROGRAMAÇÃO. Nunca invente números da planilha. Se "
-            "não ficar claro de qual aba o usuário está falando, "
-            "pergunte. As quantidades estão em caixas e o PET fica "
-            "fora das análises. "
+            "Ferramentas de planilha: você tem acesso a TODAS as abas "
+            "da planilha ANÁLISE DIÁRIA DE PROGRAMAÇÃO e das outras "
+            "planilhas da pasta dados. Nunca invente números: sempre "
+            "consulte as ferramentas.\n"
+            "- DOH, cobertura, prioridade (crítica, alta, média), "
+            "necessidade de produção e plano de ação: use resumo_pcp, "
+            "listar_produtos_pcp, buscar_produto_pcp e "
+            "exportar_plano_pcp. Nessas análises as quantidades estão "
+            "em caixas e o PET fica de fora.\n"
+            "- Qualquer outra informação, de qualquer aba (solicitações "
+            "de compra, prioridades, apontamentos, base de vendas, "
+            "fornecedores e lead time, estoque e carteira, insumos, "
+            "bobinas, cores, trocas, colunas das abas de análise etc.): "
+            "use listar_abas_planilha para ver as colunas da aba, "
+            "consultar_aba para ver linhas e resumir_aba para somas, "
+            "médias, contagens e rankings. Para achar um código ou "
+            "descrição sem saber a aba, use buscar_na_planilha.\n"
+            "Se uma ferramenta devolver erro com a lista de abas ou "
+            "colunas, corrija o nome e tente de novo antes de responder. "
+            "Diga de qual aba veio a informação. Se a pergunta servir "
+            "para mais de uma aba e não der para escolher, pergunte. "
             f"{contexto_pcp()}\n\n"
             "Responda em texto simples, sem markdown, tabelas ou "
             "asteriscos, porque a janela não formata. Em listas de "
@@ -234,7 +282,7 @@ class Max:
                 tools=FERRAMENTAS_PCP,
                 automatic_function_calling=(
                     types.AutomaticFunctionCallingConfig(
-                        maximum_remote_calls=6,
+                        maximum_remote_calls=10,
                     )
                 ),
             ),
@@ -255,14 +303,14 @@ class Max:
     # ========================================================
 
     def carregar_memoria(self):
-        if not ARQUIVO_MEMORIA.exists():
+        if not self.arquivo_memoria.exists():
             self.memoria = []
             self.salvar_memoria()
             _log("Arquivo memoria.json criado.")
             return
 
         try:
-            dados = json.loads(ARQUIVO_MEMORIA.read_text(encoding="utf-8"))
+            dados = json.loads(self.arquivo_memoria.read_text(encoding="utf-8"))
 
             if not isinstance(dados, list):
                 raise ValueError("O arquivo de memória deve conter uma lista.")
@@ -281,7 +329,7 @@ class Max:
 
     def salvar_memoria(self):
         try:
-            ARQUIVO_MEMORIA.write_text(
+            self.arquivo_memoria.write_text(
                 json.dumps(self.memoria, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
@@ -392,7 +440,7 @@ class Max:
 
     def salvar_historico(self):
         try:
-            ARQUIVO_HISTORICO.write_text(
+            self.arquivo_historico.write_text(
                 json.dumps(self.historico, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
@@ -400,11 +448,11 @@ class Max:
             _log(f"Erro ao salvar histórico: {erro}")
 
     def carregar_historico(self):
-        if not ARQUIVO_HISTORICO.exists():
+        if not self.arquivo_historico.exists():
             return
 
         try:
-            mensagens = json.loads(ARQUIVO_HISTORICO.read_text(encoding="utf-8"))
+            mensagens = json.loads(self.arquivo_historico.read_text(encoding="utf-8"))
 
             if not isinstance(mensagens, list):
                 raise ValueError("Formato do histórico inválido.")
