@@ -569,6 +569,61 @@ def buscar_na_planilha(termo: str) -> dict:
     return _protegido(planilhas.buscar, termo)
 
 
+def _registrar_exportacao(resultado):
+    """Guarda o arquivo gerado para o servidor mostrar o botão de baixar."""
+    if "arquivo" in resultado and hasattr(_exportados, "lista"):
+        _exportados.lista.append(resultado["arquivo"])
+    return resultado
+
+
+def exportar_consulta_excel(aba: str, filtros: str, colunas: str, ordenar_por: str) -> dict:
+    """Gera um arquivo Excel com as linhas de QUALQUER aba, com filtros e ordenação.
+
+    Use quando o usuário pedir para exportar, baixar, gerar uma planilha
+    ou um Excel de uma lista (ex.: "exporta as velas com status COMPRAR",
+    "me manda em Excel as solicitações aguardando"). Exporta TODAS as
+    linhas que atendem aos filtros, não só as que apareceram na conversa.
+    Para o plano de ação de DOH das abas de análise, use exportar_plano_pcp.
+
+    Args:
+        aba: Nome da aba, completo ou em parte.
+        filtros: Mesmo formato de consultar_aba. Use "" para todas as linhas.
+        colunas: Colunas separadas por vírgula. Use "" para todas as colunas.
+        ordenar_por: Coluna para ordenar, com "desc" no fim para do maior
+            para o menor. Use "" para a ordem da planilha.
+
+    Returns:
+        Nome do arquivo gerado e quantas linhas ele tem.
+    """
+    _log(f"exportando a aba {aba!r} ({filtros or 'sem filtro'})")
+    return _registrar_exportacao(
+        _protegido(planilhas.exportar_consulta, aba, filtros, colunas, ordenar_por)
+    )
+
+
+def exportar_resumo_excel(aba: str, filtros: str, agrupar_por: str, calculos: str) -> dict:
+    """Gera um arquivo Excel com um resumo (somas, médias, contagens por grupo) de QUALQUER aba.
+
+    Use quando o usuário pedir para exportar totais ou rankings (ex.:
+    "exporta a quantidade solicitada por fornecedor", "me manda em Excel
+    a venda de setembro por segmento"). Leva todos os grupos.
+
+    Args:
+        aba: Nome da aba, completo ou em parte.
+        filtros: Mesmo formato de consultar_aba. Use "" para nenhum.
+        agrupar_por: Coluna(s) para agrupar, separadas por vírgula. Use ""
+            para o total geral.
+        calculos: Mesmo formato de resumir_aba. Ex.: "soma de Quantidade, contagem".
+
+    Returns:
+        Nome do arquivo gerado e quantas linhas ele tem.
+    """
+    _log(f"exportando o resumo da aba {aba!r} ({calculos})")
+    return _registrar_exportacao(
+        _protegido(planilhas.exportar_resumo, aba, filtros, agrupar_por, calculos)
+    )
+
+
 # ============================================================
 # QUADRO DA INTERFACE (não é ferramenta do Gemini)
 # ============================================================
@@ -604,4 +659,6 @@ FERRAMENTAS_PCP = [
     consultar_aba,
     resumir_aba,
     buscar_na_planilha,
+    exportar_consulta_excel,
+    exportar_resumo_excel,
 ]

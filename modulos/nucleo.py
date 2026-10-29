@@ -290,9 +290,10 @@ class Max:
         if self.modo_web:
             extras += (
                 "Você roda num servidor da empresa e cada pessoa abre "
-                "pelo navegador. Quando exportar um plano de ação, não "
-                "cite o caminho do arquivo: diga que o botão para baixar "
-                "aparece logo abaixo da resposta. "
+                "pelo navegador. Quando exportar um arquivo (plano de "
+                "ação, consulta ou resumo), não cite o caminho do arquivo: "
+                "diga que o botão para baixar aparece logo abaixo da "
+                "resposta. "
             )
 
         entrada = (
@@ -318,6 +319,12 @@ class Max:
             "consultar_aba para ver linhas e resumir_aba para somas, "
             "médias, contagens e rankings. Para achar um código ou "
             "descrição sem saber a aba, use buscar_na_planilha.\n"
+            "- Exportar para Excel: o plano de ação de DOH com "
+            "exportar_plano_pcp; qualquer lista de qualquer aba com "
+            "exportar_consulta_excel (use os mesmos filtros da consulta "
+            "que o usuário viu); totais e rankings com "
+            "exportar_resumo_excel. Você CONSEGUE exportar qualquer aba: "
+            "nunca diga que não dá.\n"
             "TODAS as abas da lista abaixo podem ser lidas com "
             "consultar_aba e resumir_aba, inclusive as que não têm DOH "
             "(como ANÁLISE ITENS DE COMPRA). Nunca diga que não consegue "

@@ -29,6 +29,8 @@ from openpyxl import load_workbook
 
 
 PASTA_DADOS = Path(__file__).resolve().parent.parent / "dados"
+PASTA_RELATORIOS = Path(__file__).resolve().parent.parent / "relatorios"
+LIMITE_EXPORTACAO = 100_000   # linhas por arquivo exportado
 
 LINHAS_VAZIAS_PARA_PARAR = 500   # algumas abas vão "formatadas" até a linha 1.048.576
 LINHAS_PROCURA_CABECALHO = 15
@@ -680,7 +682,7 @@ def _calcular(df, operacao, coluna):
     return None if pd.isna(valor) else valor_para_json(float(valor))
 
 
-def resumir(aba, filtros, agrupar_por, calculos):
+def resumir(aba, filtros, agrupar_por, calculos, limite_grupos=LIMITE_GRUPOS):
     tabela, erro = resolver_tabela(aba)
     if erro:
         return erro
@@ -727,7 +729,7 @@ def resumir(aba, filtros, agrupar_por, calculos):
         "aba": tabela.nome,
         "linhas_consideradas": len(df),
         "grupos_encontrados": len(linhas),
-        "grupos": linhas[:LIMITE_GRUPOS],
+        "grupos": linhas[:limite_grupos] if limite_grupos else linhas,
     }
 
 
@@ -755,3 +757,140 @@ def buscar(termo, limite_por_aba=5):
         return {"termo": termo, "resultado": "Não encontrei em nenhuma aba."}
     achados.sort(key=lambda a: -a["linhas_encontradas"])
     return {"termo": termo, "abas": achados[:12]}
+
+
+# ============================================================
+# EXPORTAÇÃO PARA EXCEL
+# ============================================================
+
+def _arquivo_novo(prefixo, aba):
+    """relatorios/<Prefixo>_<ABA>_<data_hora>.xlsx, sem acentos nem espaços."""
+    PASTA_RELATORIOS.mkdir(parents=True, exist_ok=True)
+    nome = re.sub(r"[^A-Z0-9-]+", "_", normalizar(aba).replace("ANALISE", "")).strip("_")[:40]
+    base = f"{prefixo}_{nome or 'ABA'}_{datetime.now():%Y%m%d_%H%M%S}"
+    caminho = PASTA_RELATORIOS / f"{base}.xlsx"
+    n = 2
+    while caminho.exists():
+        caminho = PASTA_RELATORIOS / f"{base}_{n}.xlsx"
+        n += 1
+    return caminho
+
+
+def _para_excel(valor):
+    """Valor como o Excel entende (números e datas continuam números e datas)."""
+    if _vazio(valor):
+        return None
+    if hasattr(valor, "item") and not isinstance(valor, (datetime, date)):
+        valor = valor.item()
+    if isinstance(valor, float) and math.isinf(valor):
+        return None
+    return valor
+
+
+def _salvar_excel(caminho, df, nome_planilha, info):
+    """Grava a tabela com cabeçalho destacado, filtros e larguras ajustadas.
+
+    info vira uma segunda planilha, "Sobre", com a origem dos dados.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = nome_planilha[:31]
+    colunas = [str(c) for c in df.columns]
+    ws.append(colunas)
+    for linha in df.itertuples(index=False):
+        ws.append([_para_excel(v) for v in linha])
+
+    destaque = PatternFill("solid", fgColor="1B4D4A")
+    for celula in ws[1]:
+        celula.font = Font(bold=True, color="FFFFFF")
+        celula.fill = destaque
+        celula.alignment = Alignment(vertical="center")
+    ws.freeze_panes = "A2"
+    if ws.max_row > 1:
+        ws.auto_filter.ref = ws.dimensions
+
+    for indice, coluna in enumerate(ws.iter_cols(min_row=1, max_row=min(ws.max_row, 500)), start=1):
+        largura = 8
+        for celula in coluna:
+            valor = celula.value
+            if isinstance(valor, (datetime, date)):
+                celula.number_format = "DD/MM/YYYY" if (
+                    not isinstance(valor, datetime) or valor.time() == time(0)
+                ) else "DD/MM/YYYY HH:MM"
+                largura = max(largura, 12)
+            elif valor is not None:
+                largura = max(largura, len(str(valor)))
+        ws.column_dimensions[coluna[0].column_letter].width = min(largura + 2, 50)
+
+    sobre = wb.create_sheet("Sobre")
+    for chave, valor in info.items():
+        sobre.append([chave, valor])
+    for celula in sobre["A"]:
+        celula.font = Font(bold=True)
+    sobre.column_dimensions["A"].width = 18
+    sobre.column_dimensions["B"].width = 70
+
+    wb.save(caminho)
+    return caminho
+
+
+def exportar_consulta(aba, filtros, colunas, ordenar_por):
+    """Exporta para Excel as linhas de uma aba (com filtros e ordenação)."""
+    tabela, erro = resolver_tabela(aba)
+    if erro:
+        return erro
+    df, erro = aplicar_filtros(tabela.df, filtros)
+    if erro:
+        return {"aba": tabela.nome, **erro}
+    df, erro = _ordenar(df, ordenar_por)
+    if erro:
+        return {"aba": tabela.nome, **erro}
+    nomes = [c.strip() for c in str(colunas or "").split(",") if c.strip()]
+    if nomes:
+        escolhidas, erro = _escolher_colunas(tabela.df, colunas)
+        if erro:
+            return {"aba": tabela.nome, **erro}
+    else:
+        escolhidas = list(tabela.df.columns)  # exportação leva todas as colunas
+    if df.empty:
+        return {"aba": tabela.nome, "erro": "Nenhuma linha atende aos filtros; nada para exportar."}
+
+    cortado = len(df) > LIMITE_EXPORTACAO
+    caminho = _arquivo_novo("Consulta", tabela.nome)
+    _salvar_excel(caminho, df[escolhidas].head(LIMITE_EXPORTACAO), "Consulta", {
+        "Aba": tabela.nome,
+        "Planilha": tabela.arquivo,
+        "Filtros": filtros or "(nenhum)",
+        "Ordenação": ordenar_por or "(ordem da planilha)",
+        "Linhas": min(len(df), LIMITE_EXPORTACAO),
+        "Gerado em": datetime.now().strftime("%d/%m/%Y %H:%M"),
+    })
+    resultado = {"aba": tabela.nome, "arquivo": caminho.name, "linhas": min(len(df), LIMITE_EXPORTACAO),
+                 "colunas": len(escolhidas)}
+    if cortado:
+        resultado["aviso"] = f"Só as primeiras {LIMITE_EXPORTACAO} linhas foram exportadas."
+    return resultado
+
+
+def exportar_resumo(aba, filtros, agrupar_por, calculos):
+    """Exporta para Excel um resumo (totais por grupo) de uma aba."""
+    resultado = resumir(aba, filtros, agrupar_por, calculos, limite_grupos=None)
+    if "erro" in resultado:
+        return resultado
+    if "grupos" in resultado:
+        df = pd.DataFrame(resultado["grupos"])
+    else:
+        df = pd.DataFrame([resultado["resultado"]])
+    caminho = _arquivo_novo("Resumo", resultado["aba"])
+    _salvar_excel(caminho, df, "Resumo", {
+        "Aba": resultado["aba"],
+        "Filtros": filtros or "(nenhum)",
+        "Agrupado por": agrupar_por or "(total geral)",
+        "Cálculos": calculos,
+        "Linhas consideradas": resultado["linhas_consideradas"],
+        "Gerado em": datetime.now().strftime("%d/%m/%Y %H:%M"),
+    })
+    return {"aba": resultado["aba"], "arquivo": caminho.name, "linhas": len(df)}

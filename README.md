@@ -40,7 +40,7 @@ A mesma conversa funciona de quatro jeitos:
 - **Análise de DOH por aba** (Fiesta, Talher, Prato, Copo BCO-TRP, Copo colorido): quantos produtos estão abaixo da meta de 45 dias, quais são os mais críticos e quanto falta produzir.
 - **Consulta qualquer aba** da planilha, incluindo as ocultas: filtra, ordena, soma, tira média, conta e agrupa.
 - **Procura um código ou descrição** em todas as abas de uma vez.
-- **Exporta o plano de ação** em Excel. No site, aparece um botão **Baixar** embaixo da resposta.
+- **Exporta para Excel** o plano de ação de DOH e também qualquer consulta ou resumo de qualquer aba. No site, aparece um botão **Baixar** embaixo da resposta.
 - **Quadro "Estoque por aba"**, com a situação de cada aba em cores de andon (crítica, alta, média, na meta, sem demanda).
 - **Lembra de cada pessoa:** histórico da conversa e memória de longo prazo separados por usuário.
 
@@ -195,6 +195,8 @@ Escolha uma aba de análise e depois uma opção: ver os 20 primeiros registros,
 - Quais os 5 produtos com o estoque mais negativo no BD.ESTOQUE CARTEIRA?
 - Qual é a prioridade de produção número 1?
 - Me fala tudo o que a planilha tem sobre o código TCCFRB-10.
+- Exporta em Excel as velas com status COMPRAR na análise de itens de compra.
+- Me manda em Excel a quantidade solicitada por fornecedor.
 - Qual a carteira do segmento PET na análise da Fiesta?
 
 Dicas para perguntar:
@@ -232,6 +234,8 @@ Necessidade estimada = Estoque alvo − Estoque     (arredondada para cima; nunc
 
 O plano é ordenado da prioridade mais urgente para a menos urgente e, dentro de cada uma, do menor DOH para o maior. Ao exportar, ele vira um Excel em `relatorios/` com duas abas: **Plano de Acao** e **Resumo**.
 
+As exportações de qualquer aba (`Consulta_*.xlsx` e `Resumo_*.xlsx`) mantêm números e datas como números e datas. Elas vêm com o cabeçalho fixo e com filtro, e trazem uma planilha **Sobre** com a aba de origem, os filtros usados e a data de geração.
+
 ---
 
 ## Como a planilha é lida
@@ -262,6 +266,8 @@ Ficam em `modulos/ferramentas_pcp.py`. O Gemini escolhe sozinho qual chamar, at�
 | `consultar_aba(aba, filtros, colunas, ordenar_por, limite)` | Linhas de qualquer aba, com filtro e ordenação (até 100 linhas) |
 | `resumir_aba(aba, filtros, agrupar_por, calculos)` | Soma, média, contagem, máximo, mínimo e valores distintos, com ou sem agrupamento |
 | `buscar_na_planilha(termo)` | Procura um texto em todas as abas |
+| `exportar_consulta_excel(aba, filtros, colunas, ordenar_por)` | Excel com **todas** as linhas da consulta, com todas as colunas se `colunas` vier vazio. Gera `relatorios/Consulta_<ABA>_<data>.xlsx` |
+| `exportar_resumo_excel(aba, filtros, agrupar_por, calculos)` | Excel com os totais por grupo, sem o limite de 60 grupos da conversa. Gera `relatorios/Resumo_<ABA>_<data>.xlsx` |
 
 **Formato dos filtros** (em `consultar_aba` e `resumir_aba`), com as condições separadas por `;`:
 
@@ -363,7 +369,7 @@ Usada pela página. Cada pessoa é identificada pelo cabeçalho `X-Usuario` (o n
 | GET | `/api/estado` | `{"estado": "consultando"}` enquanto a planilha é lida |
 | GET | `/api/historico` | Últimas 30 mensagens da pessoa |
 | GET | `/api/painel` | Resumo das abas para o quadro "Estoque por aba" |
-| GET | `/relatorios/<arquivo>` | Baixa um plano exportado (só `Plano_Acao_PCP*.xlsx`) |
+| GET | `/relatorios/<arquivo>` | Baixa um arquivo exportado (só `Plano_Acao_PCP*.xlsx`, `Consulta*.xlsx` e `Resumo*.xlsx`) |
 | GET | `/favicon.ico`, `/icones/<arquivo>` | Ícones do MAX (`icone.svg`, `icone.ico`, `icone-180.png`) |
 
 **Limites:**

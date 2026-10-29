@@ -227,7 +227,7 @@ def painel():
 
 @app.get("/relatorios/<path:arquivo>")
 def baixar(arquivo):
-    if not re.fullmatch(r"Plano_Acao_PCP[\w\-]*\.xlsx", arquivo):
+    if not re.fullmatch(r"(Plano_Acao_PCP|Consulta|Resumo)[\w\-]*\.xlsx", arquivo):
         abort(404, description="Arquivo não encontrado.")
     return send_from_directory(PASTA_RELATORIOS, arquivo, as_attachment=True)
 
