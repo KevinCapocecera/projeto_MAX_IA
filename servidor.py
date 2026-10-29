@@ -1,7 +1,7 @@
 """MAX na rede da empresa: abre pelo navegador, em qualquer computador.
 
-Um computador (o servidor) roda este arquivo e os outros acessam pelo
-endereço que aparece na tela, por exemplo http://192.168.0.50:8000.
+O seu PC roda este arquivo e os outros acessam pelo endereço que
+aparece na tela, por exemplo http://nome-do-pc:8000.
 
 Cada pessoa entra com o próprio nome e tem histórico e memória
 separados, na pasta usuarios/<nome>. A chave do Gemini e a planilha
@@ -17,6 +17,7 @@ import argparse
 import os
 import re
 import socket
+import sys
 import threading
 import unicodedata
 from pathlib import Path
@@ -179,6 +180,23 @@ def _ip_na_rede():
             return "127.0.0.1"
 
 
+def _manter_acordado():
+    """Impede o Windows de suspender enquanto o MAX estiver ligado.
+
+    Vale só enquanto esta janela estiver aberta; a tela ainda pode
+    apagar. Fechar a tampa do notebook ainda suspende (isso se muda nas
+    opções de energia do Windows). Em outros sistemas não faz nada.
+    """
+    if sys.platform != "win32":
+        return False
+    import ctypes
+    ES_CONTINUOUS = 0x80000000
+    ES_SYSTEM_REQUIRED = 0x00000001
+    return bool(ctypes.windll.kernel32.SetThreadExecutionState(
+        ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+    ))
+
+
 def main():
     parser = argparse.ArgumentParser(description="MAX na rede da empresa")
     parser.add_argument("--porta", type=int, default=8000)
@@ -191,9 +209,14 @@ def main():
     if not os.getenv("GEMINI_API_KEY"):
         print("[MAX] Aviso: não encontrei GEMINI_API_KEY no arquivo .env.")
 
+    nome_pc = socket.gethostname().lower()
     print("\nMAX no ar. Para acessar:")
     print(f"  Neste computador:   http://localhost:{args.porta}")
-    print(f"  Nos outros da rede: http://{_ip_na_rede()}:{args.porta}")
+    print(f"  Nos outros da rede: http://{nome_pc}:{args.porta}")
+    print(f"           ou então:  http://{_ip_na_rede()}:{args.porta}")
+    print("  (o endereço com o nome do PC continua valendo se o IP mudar)")
+    if _manter_acordado():
+        print("O computador não vai suspender enquanto esta janela estiver aberta.")
     print("Para desligar, feche esta janela ou aperte Ctrl+C.\n", flush=True)
 
     from waitress import serve
