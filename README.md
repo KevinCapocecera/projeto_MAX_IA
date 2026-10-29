@@ -310,11 +310,12 @@ Fica em `interface/index.html`, num arquivo só, com HTML, CSS e JavaScript.
 - **Painel de LED (72 × 17)** mostra o estado do MAX: *Iniciando* (o nome MAX acende), *Pronto*, *Pensando*, *Consultando a planilha*, *Respondendo* e *Erro*. Cada nível de brilho é desenhado uma vez só e copiado, e só os LEDs que mudaram são redesenhados. Assim ele roda a 60 quadros por segundo mesmo em PCs fracos, e cai sozinho para 30 se o PC não der conta.
 - **Quadro "Estoque por aba"** mostra os dados reais da planilha e é atualizado a cada resposta e a cada 2 minutos. Clicar numa aba faz a pergunta sobre ela.
 - **Ícone da aba:** um "M" aceso num pedaço do painel de LED. Ele está embutido no `index.html`, então aparece também na janela e no modo demonstração. Os arquivos ficam em `interface/icone.*`.
+- **Voz:** o botão de alto-falante no topo faz o MAX ler cada resposta em voz alta assim que ela chega. Ele começa desligado, e cada navegador lembra a escolha. O botão **Ouvir** de cada resposta lê só aquela, mesmo com a voz desligada, e vira **Parar** enquanto fala. A voz é a do próprio navegador (grátis, sem gastar o Gemini), em português do Brasil e de preferência feminina: Francisca no Edge, Google português no Chrome ou Maria no Windows. A fala é dividida frase por frase, sem os links. Enquanto o MAX fala, o painel de LED fica no estado *Falando*, e uma pergunta nova interrompe a fala.
 - **Tema claro e escuro:** segue o Windows, com um botão para trocar.
 - **Celular:** a página se ajusta à tela.
 - **Medidor de desempenho:** abra o endereço com `?fps` no fim (`http://nome-do-pc:8000/?fps`) para ver quadros por segundo e o tempo de desenho de cada quadro.
 - **Modo demonstração:** aberto direto do arquivo, sem servidor nem pywebview, o `index.html` responde só a algumas perguntas de exemplo, com os números de 19/10.
-- **Botão do microfone:** está desativado, porque a voz é uma etapa futura (veja os testes de áudio).
+- **Botão do microfone:** está desativado, porque falar com o MAX por voz é uma etapa futura (veja os testes de áudio).
 
 ---
 

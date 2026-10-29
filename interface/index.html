@@ -257,6 +257,26 @@
   }
 
   .msg-assistente .msg-quem { color: var(--led); }
+
+  /* Voz: botão do topo ligado e o "Ouvir" de cada resposta */
+  .botao-icone[aria-pressed="true"] { border-color: var(--led); color: var(--led); }
+  .ouvir {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--texto-suave);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .ouvir:hover, .ouvir:focus-visible { border-color: var(--linha); color: var(--led); }
+  .ouvir svg { width: 14px; height: 14px; }
+  .ouvir[aria-pressed="true"] { color: var(--led); }
   .msg-assistente .msg-texto { font-size: 1.0625rem; max-width: 78ch; }
 
   .msg-voce {
@@ -505,6 +525,11 @@
       <span class="selo" id="selo-planilha">Planilha de exemplo</span>
       <button class="selo selo-usuario" id="selo-usuario" type="button" hidden
               title="Trocar de usuário"></button>
+      <button class="botao-icone" id="botao-voz" type="button" aria-pressed="false" hidden
+              aria-label="Ler as respostas em voz alta" title="Ler as respostas em voz alta">
+        <svg id="icone-voz" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+      </button>
       <button class="botao-icone" id="botao-tema" type="button" aria-label="Mudar o tema">
         <svg id="icone-tema" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
@@ -1079,6 +1104,9 @@
     hora.dateTime = d.toISOString();
     hora.textContent = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     cabecalho.append(nome, hora);
+    if (quem === "assistente" && !erro && voz.disponivel) {
+      cabecalho.append(botaoOuvir(texto));
+    }
 
     const corpo = document.createElement("div");
     corpo.className = "msg-texto";
@@ -1120,6 +1148,7 @@
       ajustarAltura();
     }
     adicionarMensagem("voce", texto);
+    calar();
 
     ocupada = true;
     botaoEnviar.disabled = true;
@@ -1146,7 +1175,11 @@
       definirEstado("falando");
       const msg = adicionarMensagem("assistente", textoResposta);
       adicionarArquivos(msg, resposta && resposta.arquivos);
-      voltarParaPronto(Math.min(4500, 700 + textoResposta.length * 15));
+      if (voz.ligada) {
+        falar(textoResposta, msg.querySelector(".ouvir"));
+      } else {
+        voltarParaPronto(Math.min(4500, 700 + textoResposta.length * 15));
+      }
     } catch (erro) {
       definirEstado("erro");
       adicionarMensagem(
@@ -1160,6 +1193,153 @@
       ocupada = false;
       botaoEnviar.disabled = false;
       entrada.focus();
+    }
+  }
+
+  /* ============================================================
+     VOZ (leitura das respostas em voz alta)
+     Usa a voz do próprio navegador (speechSynthesis): grátis, sem
+     gastar o Gemini. Começa desligada; cada pessoa liga no botão do
+     alto-falante e o navegador lembra a escolha. O botão "Ouvir" de
+     cada resposta funciona mesmo com a voz desligada.
+     ============================================================ */
+  const sintese = "speechSynthesis" in window ? window.speechSynthesis : null;
+  const voz = { disponivel: !!sintese, ligada: false, escolhida: null, botaoAtivo: null, fila: 0 };
+  try { voz.ligada = voz.disponivel && localStorage.getItem("max-voz") === "1"; } catch (erro) { /* sem armazenamento */ }
+
+  /* Vozes femininas em português do Brasil, da mais natural para a menos. */
+  const VOZES_PREFERIDAS = ["francisca", "thalita", "google português do brasil", "luciana", "maria"];
+
+  function escolherVoz() {
+    if (!sintese) return;
+    const vozes = sintese.getVoices();
+    const ptBR = vozes.filter((v) => /^pt[-_]BR/i.test(v.lang));
+    const pt = ptBR.length ? ptBR : vozes.filter((v) => /^pt/i.test(v.lang));
+    voz.escolhida =
+      VOZES_PREFERIDAS.map((nome) => pt.find((v) => v.name.toLowerCase().includes(nome))).find(Boolean) ||
+      pt[0] || null;
+  }
+  if (sintese) {
+    escolherVoz();
+    sintese.addEventListener?.("voiceschanged", escolherVoz);
+  }
+
+  /* Texto mais natural para ouvir: sem links e com pausas nas quebras. */
+  function textoParaFalar(texto) {
+    return String(texto)
+      .replace(/https?:\/\/\S+/g, "")
+      .replace(/[*_#`>]+/g, " ")
+      .replace(/\s*\n+\s*/g, ". ")
+      .replace(/\.\s*\./g, ".")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
+  /* O Chrome corta falas longas (~15 s), então fala frase por frase. */
+  function emPedacos(texto, maximo = 180) {
+    // Corta só onde a pontuação é seguida de espaço (não quebra "57.4" nem "F-12").
+    const frases = texto.split(/(?<=[.!?;:])\s+/).map((f) => f + " ");
+    const pedacos = [];
+    let atual = "";
+    for (const frase of frases) {
+      if ((atual + frase).length > maximo && atual) { pedacos.push(atual.trim()); atual = ""; }
+      if (frase.length > maximo) {
+        frase.split(/(?<=,)\s+/).forEach((parte) => {
+          if ((atual + parte).length > maximo && atual) { pedacos.push(atual.trim()); atual = ""; }
+          atual += parte + " ";
+        });
+      } else {
+        atual += frase;
+      }
+    }
+    if (atual.trim()) pedacos.push(atual.trim());
+    return pedacos;
+  }
+
+  function marcarBotao(botao, falando) {
+    if (!botao) return;
+    botao.setAttribute("aria-pressed", falando ? "true" : "false");
+    botao.lastChild.textContent = falando ? "Parar" : "Ouvir";
+  }
+
+  function calar() {
+    if (!sintese) return;
+    voz.fila++;                       // invalida as frases que ainda iam ser faladas
+    sintese.cancel();
+    marcarBotao(voz.botaoAtivo, false);
+    voz.botaoAtivo = null;
+  }
+
+  function falar(texto, botao) {
+    if (!sintese) return;
+    calar();
+    const pedacos = emPedacos(textoParaFalar(texto));
+    if (!pedacos.length) return;
+    const minhaFila = voz.fila;
+    voz.botaoAtivo = botao || null;
+    marcarBotao(botao, true);
+    clearTimeout(voltaParaPronto);
+    definirEstado("falando", "Falando…");
+
+    pedacos.forEach((pedaco, i) => {
+      const fala = new SpeechSynthesisUtterance(pedaco);
+      fala.lang = (voz.escolhida && voz.escolhida.lang) || "pt-BR";
+      if (voz.escolhida) fala.voice = voz.escolhida;
+      fala.rate = 1.05;
+      if (i === pedacos.length - 1) {
+        fala.onend = fala.onerror = () => {
+          if (minhaFila !== voz.fila) return;   // foi interrompida
+          marcarBotao(botao, false);
+          voz.botaoAtivo = null;
+          voltarParaPronto(300);
+        };
+      }
+      sintese.speak(fala);
+    });
+  }
+
+  function botaoOuvir(texto) {
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "ouvir";
+    botao.setAttribute("aria-pressed", "false");
+    botao.title = "Ouvir esta resposta";
+    botao.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>';
+    botao.append(document.createTextNode("Ouvir"));
+    botao.addEventListener("click", () => {
+      if (voz.botaoAtivo === botao) { calar(); voltarParaPronto(200); }
+      else falar(texto, botao);
+    });
+    return botao;
+  }
+
+  const ICONE_VOZ_LIGADA =
+    '<path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path>';
+  const ICONE_VOZ_DESLIGADA =
+    '<path d="M11 5 6 9H3v6h3l5 4z"></path><path d="m16 9 5 6M21 9l-5 6"></path>';
+
+  function atualizarBotaoVoz() {
+    const botao = $("botao-voz");
+    botao.hidden = !voz.disponivel;
+    $("icone-voz").innerHTML = voz.ligada ? ICONE_VOZ_LIGADA : ICONE_VOZ_DESLIGADA;
+    botao.setAttribute("aria-pressed", voz.ligada ? "true" : "false");
+    const dica = voz.ligada ? "Voz ligada: clique para silenciar" : "Ler as respostas em voz alta";
+    botao.title = dica;
+    botao.setAttribute("aria-label", dica);
+  }
+
+  function trocarVoz() {
+    voz.ligada = !voz.ligada;
+    try { localStorage.setItem("max-voz", voz.ligada ? "1" : "0"); } catch (erro) { /* sem armazenamento */ }
+    atualizarBotaoVoz();
+    if (voz.ligada) {
+      falar("Voz ligada. Vou ler as respostas.");   // também libera o áudio no celular
+    } else {
+      calar();
+      voltarParaPronto(200);
     }
   }
 
@@ -1284,6 +1464,8 @@
   }
 
   $("botao-tema").addEventListener("click", trocarTema);
+  $("botao-voz").addEventListener("click", trocarVoz);
+  atualizarBotaoVoz();
   escuroNoSistema.addEventListener("change", () => { atualizarBotaoTema(); lerCores(); });
 
   botaoEnviar.addEventListener("click", () => enviar());
