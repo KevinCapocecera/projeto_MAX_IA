@@ -81,6 +81,18 @@ def abas_disponiveis():
     )
 
 
+def abas_com_doh():
+    """Abas de análise que têm de fato as colunas de DOH."""
+    nomes = []
+    for nome in abas_disponiveis():
+        try:
+            _dados_da_aba(nome)
+        except ValueError:
+            continue  # ex.: ANÁLISE ITENS DE COMPRA (sem Demanda/DOH TT)
+        nomes.append(nome)
+    return nomes
+
+
 def _dados_da_aba(nome_aba):
     """Devolve (dados brutos, plano de ação) da aba."""
     arquivo = localizar_planilha()
@@ -98,7 +110,7 @@ def contexto_pcp():
     try:
         texto = (
             "Abas com análise de DOH: "
-            + ", ".join(abas_disponiveis())
+            + ", ".join(abas_com_doh())
             + "."
         )
     except Exception as erro:
@@ -162,8 +174,12 @@ def _resolver_aba(aba):
 
     if not candidatas:
         return None, {
-            "erro": f"Não encontrei a aba '{aba}'.",
-            "abas_disponiveis": abas,
+            "erro": (
+                f"'{aba}' não é uma aba com análise de DOH. Para ler "
+                "qualquer outra aba, use consultar_aba, resumir_aba ou "
+                "listar_abas_planilha."
+            ),
+            "abas_com_doh": abas_com_doh(),
         }
 
     return None, {
@@ -186,8 +202,10 @@ def _plano(aba):
     except ValueError:
         return None, None, None, {
             "erro": (
-                f"A aba {nome} ainda não tem análise de DOH "
-                "(faltam as colunas Demanda e DOH TT)."
+                f"A aba {nome} não tem análise de DOH (faltam as colunas "
+                "Demanda e DOH TT), mas pode ser lida normalmente: use "
+                f"consultar_aba ou resumir_aba com aba=\"{nome}\". Veja as "
+                "colunas com listar_abas_planilha."
             )
         }
 

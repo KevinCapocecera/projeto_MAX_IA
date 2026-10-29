@@ -30,6 +30,7 @@ PERGUNTAS = [
     "Me fala tudo o que a planilha tem sobre o código TCCFRB-10.",
     "Como está a Fiesta?",
     "Qual a carteira do segmento PET na análise da Fiesta?",
+    'Quais itens estão com status "COMPRAR" na análise de itens de compra?',
 ]
 
 
