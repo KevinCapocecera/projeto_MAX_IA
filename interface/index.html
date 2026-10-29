@@ -443,6 +443,48 @@
   @media (prefers-reduced-motion: reduce) {
     .conversa { scroll-behavior: auto; }
   }
+
+  /* ============================================================
+     SERVIDOR NA REDE: entrada com o nome e arquivos para baixar
+     ============================================================ */
+  .selo-usuario { background: transparent; cursor: pointer; font: inherit;
+    font-family: var(--fonte-estreita); font-size: 0.875rem; }
+  .selo-usuario:hover { border-color: var(--texto-suave); color: var(--texto); }
+
+  .entrar {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center; padding: 16px;
+    background: color-mix(in srgb, var(--aco) 88%, transparent);
+    backdrop-filter: blur(4px);
+  }
+  .entrar[hidden] { display: none; }
+  .entrar-caixa {
+    width: min(380px, 100%);
+    display: grid; gap: 12px;
+    padding: 24px;
+    background: var(--painel);
+    border: 1px solid var(--linha);
+    border-radius: 12px;
+    color: var(--texto);
+    font-family: var(--fonte);
+  }
+  .entrar-caixa h2 { margin: 0; font-size: 1.25rem; }
+  .entrar-caixa p { margin: 0; color: var(--texto-suave); }
+  .entrar-caixa input {
+    font: inherit; font-size: 1rem; padding: 10px 12px;
+    border: 1px solid var(--linha); border-radius: 8px;
+    background: var(--bolha); color: var(--texto);
+  }
+  .entrar-caixa input:focus { outline: 2px solid var(--led); outline-offset: 1px; }
+
+  .msg-arquivos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .msg-arquivos a {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 8px;
+    background: var(--led); color: var(--sobre-led);
+    text-decoration: none; font-family: var(--fonte-estreita);
+  }
+  .msg-arquivos a:hover { filter: brightness(1.08); }
 </style>
 </head>
 <body>
@@ -455,6 +497,8 @@
       <span class="selo selo-demo" id="selo-demo"
             title="As respostas são simuladas até a interface ser ligada ao Python">Demonstração</span>
       <span class="selo" id="selo-planilha">Planilha de exemplo</span>
+      <button class="selo selo-usuario" id="selo-usuario" type="button" hidden
+              title="Trocar de usuário"></button>
       <button class="botao-icone" id="botao-tema" type="button" aria-label="Mudar o tema">
         <svg id="icone-tema" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
@@ -517,6 +561,16 @@
 
 </div>
 
+<div class="entrar" id="entrar" hidden>
+  <form class="entrar-caixa" id="form-entrar">
+    <h2>Bem-vindo ao MAX</h2>
+    <p>Digite seu nome. Ele separa o seu histórico de conversa do das outras pessoas.</p>
+    <input id="nome-usuario" type="text" maxlength="60" autocomplete="name"
+           placeholder="Seu nome" aria-label="Seu nome" required>
+    <button class="enviar" type="submit">Entrar</button>
+  </form>
+</div>
+
 <script>
 (() => {
   "use strict";
@@ -545,8 +599,48 @@
     window.addEventListener("pywebviewready", () => ok(apiCompleta()), { once: true });
   });
 
+  /* ============================================================
+     SERVIDOR NA REDE (servidor.py)
+     O servidor marca window.MAX_SERVIDOR. Cada pessoa entra com o
+     nome, que vai em todas as chamadas (cabeçalho X-Usuario).
+     ============================================================ */
+  const NO_SERVIDOR = window.MAX_SERVIDOR === true;
+  let usuario = "";
+  try { usuario = localStorage.getItem("max-usuario") || ""; } catch (erro) { /* sem armazenamento */ }
+
+  async function chamar(caminho, corpo) {
+    const opcoes = { headers: { "X-Usuario": encodeURIComponent(usuario) } };
+    if (corpo !== undefined) {
+      opcoes.method = "POST";
+      opcoes.headers["Content-Type"] = "application/json";
+      opcoes.body = JSON.stringify(corpo);
+    }
+    let resposta;
+    try {
+      resposta = await fetch(caminho, opcoes);
+    } catch (erro) {
+      throw new Error("Não consegui falar com o servidor do MAX. Ele está ligado?");
+    }
+    const dados = await resposta.json().catch(() => ({}));
+    if (!resposta.ok || dados.erro) throw new Error(dados.erro || `Erro ${resposta.status}`);
+    return dados;
+  }
+
+  const apiServidor = {
+    perguntar: (texto) => chamar("/api/perguntar", { texto }),
+    painel: () => chamar("/api/painel"),
+    estado: () => chamar("/api/estado"),
+    historico: () => chamar("/api/historico"),
+  };
+
+  const apiAtual = () => (NO_SERVIDOR ? (usuario ? apiServidor : null) : apiCompleta());
+
   /* Devolve a ponte com o Python, ou null no modo demonstração. */
   async function obterApi() {
+    if (NO_SERVIDOR) {
+      if (!usuario) throw new Error("Digite seu nome para começar.");
+      return apiServidor;
+    }
     if (apiCompleta()) return apiCompleta();
     if (!NO_PROGRAMA && !window.pywebview) return null;
     const limite = new Promise((_, falha) => setTimeout(
@@ -910,6 +1004,23 @@
     msg.append(cabecalho, corpo);
     mensagens.append(msg);
     conversa.scrollTop = conversa.scrollHeight;
+    return msg;
+  }
+
+  /* Botões para baixar os planos exportados nesta resposta. */
+  function adicionarArquivos(msg, arquivos) {
+    if (!msg || !arquivos || !arquivos.length) return;
+    const caixa = document.createElement("div");
+    caixa.className = "msg-arquivos";
+    for (const arquivo of arquivos) {
+      const link = document.createElement("a");
+      link.href = arquivo.url;
+      link.download = arquivo.nome;
+      link.textContent = `Baixar ${arquivo.nome}`;
+      caixa.append(link);
+    }
+    msg.append(caixa);
+    conversa.scrollTop = conversa.scrollHeight;
   }
 
   function ajustarAltura() {
@@ -932,13 +1043,26 @@
     clearTimeout(voltaParaPronto);
     definirEstado("pensando");
 
+    /* No servidor, pergunta a cada meio segundo se o MAX está lendo
+       a planilha, para acender o "consultando" no painel de LED. */
+    let acompanhar = null;
     try {
       const api = await obterApi();
+      if (api === apiServidor) {
+        acompanhar = setInterval(async () => {
+          try {
+            const { estado } = await apiServidor.estado();
+            if (estado === "consultando" && ocupada) definirEstado("consultando");
+          } catch (erro) { /* só o LED; ignora */ }
+        }, 500);
+      }
       const resposta = api ? await api.perguntar(texto) : await demonstracao(texto);
+      clearInterval(acompanhar);
       if (api) atualizarPainel();
       const textoResposta = (resposta && resposta.texto) || "Não recebi uma resposta em texto.";
       definirEstado("falando");
-      adicionarMensagem("assistente", textoResposta);
+      const msg = adicionarMensagem("assistente", textoResposta);
+      adicionarArquivos(msg, resposta && resposta.arquivos);
       voltarParaPronto(Math.min(4500, 700 + textoResposta.length * 15));
     } catch (erro) {
       definirEstado("erro");
@@ -949,6 +1073,7 @@
       );
       voltarParaPronto(1600);
     } finally {
+      clearInterval(acompanhar);
       ocupada = false;
       botaoEnviar.disabled = false;
       entrada.focus();
@@ -1054,7 +1179,7 @@
      ============================================================ */
   window.assistente = { estado: definirEstado };
 
-  if (NO_PROGRAMA) {
+  if (NO_PROGRAMA || NO_SERVIDOR) {
     $("selo-demo").hidden = true;
     $("selo-planilha").textContent = "Lendo a planilha…";
     $("andon-fonte").textContent = "Lendo a planilha…";
@@ -1093,7 +1218,7 @@
   /* Quadro com os dados reais (relido a cada resposta e a cada 2 minutos;
      o Python só lê a planilha de novo se o arquivo tiver sido salvo). */
   async function atualizarPainel() {
-    const api = apiCompleta();
+    const api = apiAtual();
     if (!api) return;
     try {
       const dados = await api.painel();
@@ -1105,8 +1230,59 @@
     }
   }
 
+  /* ---------- Entrada com o nome (só no servidor) ---------- */
+  async function carregarConversa() {
+    mensagens.replaceChildren();
+    $("vazio").hidden = false;
+    try {
+      const { mensagens: antigas } = await apiServidor.historico();
+      for (const item of antigas || []) {
+        adicionarMensagem(item.role === "user" ? "voce" : "assistente", item.content);
+      }
+    } catch (erro) { /* começa com a conversa vazia */ }
+  }
+
+  function mostrarUsuario() {
+    const selo = $("selo-usuario");
+    selo.textContent = usuario;
+    selo.hidden = !usuario;
+    selo.setAttribute("aria-label", `Usuário: ${usuario}. Clique para trocar.`);
+  }
+
+  function pedirNome() {
+    $("nome-usuario").value = usuario;
+    $("entrar").hidden = false;
+    $("nome-usuario").focus();
+  }
+
+  let servidorIniciado = false;
+  function entrarNoServidor() {
+    mostrarUsuario();
+    carregarConversa();
+    atualizarPainel();
+    if (!servidorIniciado) {
+      servidorIniciado = true;
+      setInterval(atualizarPainel, 120000);
+    }
+    entrada.focus();
+  }
+
+  if (NO_SERVIDOR) {
+    $("form-entrar").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const nome = $("nome-usuario").value.trim().replace(/\s+/g, " ");
+      if (!nome) return;
+      usuario = nome;
+      try { localStorage.setItem("max-usuario", nome); } catch (erro) { /* sem armazenamento */ }
+      $("entrar").hidden = true;
+      entrarNoServidor();
+    });
+    $("selo-usuario").addEventListener("click", pedirNome);
+    if (usuario) entrarNoServidor(); else pedirNome();
+  }
+
   apiPronta.then((api) => {
-    if (!api) return;
+    if (!api || NO_SERVIDOR) return;
     $("selo-demo").hidden = true;
     atualizarPainel();
     setInterval(atualizarPainel, 120000);

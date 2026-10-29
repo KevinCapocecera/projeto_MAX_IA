@@ -234,6 +234,20 @@ def _log(texto):
             print(f"[MAX] Aviso para a interface falhou: {erro}", flush=True)
 
 
+# Arquivos exportados durante a pergunta que está sendo respondida nesta
+# thread. O servidor (servidor.py) usa isso para mostrar o botão de
+# baixar logo abaixo da resposta.
+_exportados = threading.local()
+
+
+def comecar_registro_exportacoes():
+    _exportados.lista = []
+
+
+def exportacoes_registradas():
+    return list(getattr(_exportados, "lista", []))
+
+
 def _contagem(plano):
     """Quantidade de produtos por prioridade e o total abaixo da meta."""
     contagem = plano["Prioridade"].value_counts()
@@ -409,6 +423,8 @@ def exportar_plano_pcp(aba: str) -> dict:
         return erro
 
     arquivo = salvar_plano(plano, nome_aba=nome)
+    if hasattr(_exportados, "lista"):
+        _exportados.lista.append(arquivo.name)
     return {
         "aba": nome,
         "arquivo": str(arquivo.resolve()),
