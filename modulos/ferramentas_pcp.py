@@ -117,7 +117,9 @@ def contexto_pcp():
         return f"A planilha de PCP não pôde ser lida agora: {erro}"
     try:
         nomes = [
-            t.nome + (" (oculta)" if t.oculta else "")
+            t.nome
+            + (" (oculta)" if t.oculta else "")
+            + (" (anexada pelo usuário)" if t.anexo else "")
             for t in planilhas.tabelas()
         ]
         texto += " Todas as abas que dá para consultar: " + "; ".join(nomes) + "."

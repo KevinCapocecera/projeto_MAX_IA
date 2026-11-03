@@ -41,6 +41,7 @@ A mesma conversa funciona de quatro jeitos:
 - **Consulta qualquer aba** da planilha, incluindo as ocultas: filtra, ordena, soma, tira média, conta e agrupa.
 - **Procura um código ou descrição** em todas as abas de uma vez.
 - **Exporta para Excel** o plano de ação de DOH e também qualquer consulta ou resumo de qualquer aba. No site, aparece um botão **Baixar** embaixo da resposta.
+- **Lê planilhas anexadas no chat** (`.xlsx`, `.xlsm` ou `.csv`, até 30 MB): clique no clipe ao lado da caixa de mensagem ou arraste o arquivo para a janela. O MAX responde com as abas e colunas que encontrou, e dá para pedir análises, somas, rankings e exportações como em qualquer outra aba. Cada pessoa só vê as próprias planilhas anexadas.
 - **Quadro "Estoque por aba"**, com a situação de cada aba em cores de andon (crítica, alta, média, na meta, sem demanda).
 - **Lembra de cada pessoa:** histórico da conversa e memória de longo prazo separados por usuário.
 
@@ -295,11 +296,13 @@ Os nomes de aba e de coluna podem ser parciais, por exemplo "solicitações", "f
 |---|---|---|
 | Histórico da conversa | `usuarios/<nome>/historico.json` | `historico.json` |
 | Memória de longo prazo | `usuarios/<nome>/memoria.json` | `memoria.json` |
+| Planilhas anexadas | `usuarios/<nome>/anexos/` | (não tem) |
 
 - **Histórico:** o Gemini recebe as últimas 12 mensagens. No site, ao entrar, a pessoa vê as últimas 30.
 - **Memória:** depois de cada resposta, o Gemini consolida fatos úteis sobre a pessoa e os projetos, numa lista JSON de `{categoria, conteudo}`. Senhas, chaves e a data do dia não são guardadas. Se a consolidação falhar ou vier vazia, a memória anterior é mantida. A cada pergunta, entram no prompt até 5 memórias com palavras em comum com a pergunta.
 - **Nome da pasta:** o nome digitado vira a pasta, sem acentos, em minúsculas e com `_` no lugar dos espaços. "João Silva" vira `usuarios/joao_silva/`.
 - **Levar o histórico da janela para o site:** copie `historico.json` e `memoria.json` para `usuarios/<seu_nome>/` antes de entrar pela primeira vez.
+- **Planilhas anexadas:** ficam guardadas até a pessoa clicar no **×** ao lado do nome, acima da caixa de mensagem. Anexar de novo um arquivo com o mesmo nome troca a versão antiga; se o arquivo novo não abrir, a antiga continua. Na conversa, as abas aparecem com o nome do arquivo no começo (`Estoque outubro - Planilha1`). Um `.csv` vira uma aba só, com o separador (`;`, `,` ou tabulação) e as datas `dd/mm/aaaa` reconhecidos sozinhos. Arquivos `.xls` (Excel antigo) precisam ser salvos como `.xlsx` antes.
 
 ---
 
@@ -353,7 +356,7 @@ projeto_MAX_IA/
 │
 ├── dados/                    Planilhas lidas pelo MAX
 ├── relatorios/               Planos de ação exportados
-├── usuarios/                 Histórico e memória de cada pessoa (criada pelo servidor)
+├── usuarios/                 Histórico, memória e planilhas anexadas de cada pessoa (criada pelo servidor)
 └── testes/                   Testes do Gemini, das planilhas e do microfone
 ```
 

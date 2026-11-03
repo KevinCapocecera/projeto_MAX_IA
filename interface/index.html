@@ -511,6 +511,30 @@
     text-decoration: none; font-family: var(--fonte-estreita);
   }
   .msg-arquivos a:hover { filter: brightness(1.08); }
+
+  /* Planilhas anexadas: clipe, lista acima da caixa e arrastar e soltar */
+  .compor { flex-wrap: wrap; }
+  .anexos { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+  .anexos[hidden] { display: none; }
+  .anexo {
+    display: inline-flex; align-items: center; gap: 4px;
+    max-width: 100%;
+    padding: 3px 4px 3px 10px;
+    border: 1px solid var(--linha); border-radius: 8px;
+    background: var(--bolha); color: var(--texto);
+    font-family: var(--fonte-estreita); font-size: 0.875rem;
+  }
+  .anexo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .anexo button {
+    padding: 2px 6px; border: 0; border-radius: 4px;
+    background: none; color: var(--texto-suave);
+    font: inherit; font-size: 1rem; line-height: 1; cursor: pointer;
+  }
+  .anexo button:hover, .anexo button:focus-visible { color: var(--texto); }
+  .clipe { width: 46px; height: 46px; border-radius: 12px; }
+  .clipe:disabled { opacity: 0.5; cursor: progress; }
+  .clipe[hidden] { display: none; }   /* .botao-icone usa display: grid */
+  .app.arrastando .compor { outline: 2px dashed var(--led); outline-offset: -6px; }
 </style>
 </head>
 <body>
@@ -575,6 +599,16 @@
   </main>
 
   <footer class="compor">
+    <div class="anexos" id="anexos" hidden aria-label="Planilhas anexadas"></div>
+    <button class="botao-icone clipe" id="clipe" type="button" hidden
+            aria-label="Anexar planilha (.xlsx, .xlsm ou .csv)"
+            title="Anexar planilha (.xlsx, .xlsm ou .csv)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+      </svg>
+    </button>
+    <input type="file" id="arquivo-anexo" accept=".xlsx,.xlsm,.csv" hidden>
     <button class="botao-icone mic" id="mic" type="button" disabled
             aria-label="Falar com o MAX (a voz chega na próxima etapa)"
             title="A voz chega na próxima etapa">
@@ -641,7 +675,10 @@
 
   async function chamar(caminho, corpo) {
     const opcoes = { headers: { "X-Usuario": encodeURIComponent(usuario) } };
-    if (corpo !== undefined) {
+    if (corpo instanceof FormData) {
+      opcoes.method = "POST";   // arquivo: o navegador monta o Content-Type
+      opcoes.body = corpo;
+    } else if (corpo !== undefined) {
       opcoes.method = "POST";
       opcoes.headers["Content-Type"] = "application/json";
       opcoes.body = JSON.stringify(corpo);
@@ -662,6 +699,13 @@
     painel: () => chamar("/api/painel"),
     estado: () => chamar("/api/estado"),
     historico: () => chamar("/api/historico"),
+    anexos: () => chamar("/api/anexos"),
+    anexar: (arquivo) => {
+      const corpo = new FormData();
+      corpo.append("arquivo", arquivo);
+      return chamar("/api/anexos", corpo);
+    },
+    removerAnexo: (nome) => chamar("/api/anexos/remover", { nome }),
   };
 
   const apiAtual = () => (NO_SERVIDOR ? (usuario ? apiServidor : null) : apiCompleta());
@@ -1344,6 +1388,99 @@
   }
 
   /* ============================================================
+     PLANILHAS ANEXADAS (só no servidor)
+     O clipe (ou arrastar o arquivo para a janela) manda a planilha ao
+     servidor, que lê, guarda em usuarios/<nome>/anexos e responde com
+     um resumo das abas. Cada pessoa só vê as próprias planilhas.
+     ============================================================ */
+  const ACEITOS = /\.(xlsx|xlsm|csv)$/i;
+  const botaoClipe = $("clipe");
+  const escolherArquivo = $("arquivo-anexo");
+
+  function mostrarAnexos(nomes) {
+    const lista = $("anexos");
+    lista.replaceChildren();
+    for (const nome of nomes || []) {
+      const item = document.createElement("span");
+      item.className = "anexo";
+      item.title = nome;
+      const texto = document.createElement("span");
+      texto.textContent = nome;
+      const remover = document.createElement("button");
+      remover.type = "button";
+      remover.textContent = "×";
+      remover.title = "Remover";
+      remover.setAttribute("aria-label", `Remover a planilha ${nome}`);
+      remover.addEventListener("click", () => removerAnexo(nome));
+      item.append(texto, remover);
+      lista.append(item);
+    }
+    lista.hidden = !lista.childElementCount;
+  }
+
+  async function carregarAnexos() {
+    try {
+      mostrarAnexos((await apiServidor.anexos()).anexos);
+    } catch (erro) { /* fica sem a lista; o clipe continua funcionando */ }
+  }
+
+  async function anexar(arquivo) {
+    if (!arquivo || ocupada) return;
+    if (!usuario) { pedirNome(); return; }
+    if (!ACEITOS.test(arquivo.name)) {
+      adicionarMensagem(
+        "assistente",
+        `Não consigo ler ${arquivo.name}. Anexe uma planilha .xlsx, .xlsm ou .csv.`,
+        true
+      );
+      return;
+    }
+
+    adicionarMensagem("voce", `Anexei a planilha ${arquivo.name}.`);
+    calar();
+    ocupada = true;
+    botaoEnviar.disabled = true;
+    botaoClipe.disabled = true;
+    clearTimeout(voltaParaPronto);
+    definirEstado("consultando", "Lendo a planilha…");
+    try {
+      const resposta = await apiServidor.anexar(arquivo);
+      mostrarAnexos(resposta.anexos);
+      definirEstado("falando");
+      const msg = adicionarMensagem("assistente", resposta.texto);
+      if (voz.ligada) falar(resposta.texto, msg.querySelector(".ouvir"));
+      else voltarParaPronto(1500);
+    } catch (erro) {
+      definirEstado("erro");
+      adicionarMensagem(
+        "assistente",
+        `Não consegui anexar a planilha. Detalhes: ${(erro && erro.message) || erro}`,
+        true
+      );
+      voltarParaPronto(1600);
+    } finally {
+      ocupada = false;
+      botaoEnviar.disabled = false;
+      botaoClipe.disabled = false;
+      entrada.focus();
+    }
+  }
+
+  async function removerAnexo(nome) {
+    if (!confirm(`Remover a planilha ${nome}? O MAX deixa de ler esse arquivo.`)) return;
+    try {
+      mostrarAnexos((await apiServidor.removerAnexo(nome)).anexos);
+    } catch (erro) {
+      adicionarMensagem(
+        "assistente",
+        `Não consegui remover a planilha. Detalhes: ${(erro && erro.message) || erro}`,
+        true
+      );
+      carregarAnexos();
+    }
+  }
+
+  /* ============================================================
      MODO DEMONSTRAÇÃO (página aberta direto no navegador)
      ============================================================ */
   async function demonstracao(texto) {
@@ -1524,6 +1661,7 @@
   function entrarNoServidor() {
     mostrarUsuario();
     carregarConversa();
+    carregarAnexos();
     atualizarPainel();
     if (!servidorIniciado) {
       servidorIniciado = true;
@@ -1543,6 +1681,43 @@
       entrarNoServidor();
     });
     $("selo-usuario").addEventListener("click", pedirNome);
+
+    botaoClipe.hidden = false;
+    entrada.placeholder = "Digite sua pergunta ou arraste uma planilha aqui";
+    botaoClipe.addEventListener("click", () => escolherArquivo.click());
+    escolherArquivo.addEventListener("change", () => {
+      const arquivo = escolherArquivo.files[0];
+      escolherArquivo.value = "";   // deixa mandar o mesmo arquivo de novo
+      anexar(arquivo);
+    });
+
+    /* Arrastar uma planilha para qualquer parte da janela também anexa. */
+    const app = document.querySelector(".app");
+    const temArquivo = (e) => Array.from((e.dataTransfer && e.dataTransfer.types) || []).includes("Files");
+    let arrastos = 0;   // dragenter/dragleave disparam a cada elemento cruzado
+    document.addEventListener("dragenter", (e) => {
+      if (!temArquivo(e)) return;
+      arrastos++;
+      app.classList.add("arrastando");
+    });
+    document.addEventListener("dragleave", (e) => {
+      if (!temArquivo(e)) return;
+      if (--arrastos <= 0) {
+        arrastos = 0;
+        app.classList.remove("arrastando");
+      }
+    });
+    document.addEventListener("dragover", (e) => {
+      if (temArquivo(e)) e.preventDefault();
+    });
+    document.addEventListener("drop", (e) => {
+      if (!temArquivo(e)) return;
+      e.preventDefault();
+      arrastos = 0;
+      app.classList.remove("arrastando");
+      anexar(e.dataTransfer.files[0]);
+    });
+
     if (usuario) entrarNoServidor(); else pedirNome();
   }
 

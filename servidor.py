@@ -5,7 +5,8 @@ aparece na tela, por exemplo http://nome-do-pc:8000.
 
 Cada pessoa entra com o próprio nome e tem histórico e memória
 separados, na pasta usuarios/<nome>. A chave do Gemini e a planilha
-ficam só no servidor; quem acessa nunca vê a chave.
+ficam só no servidor; quem acessa nunca vê a chave. As planilhas que
+cada pessoa anexa pelo chat ficam em usuarios/<nome>/anexos e só ela vê.
 
 Para rodar:
     .venv/Scripts/python servidor.py
@@ -25,7 +26,7 @@ from urllib.parse import unquote
 
 from flask import Flask, Response, abort, jsonify, request, send_from_directory
 
-from modulos import ferramentas_pcp
+from modulos import ferramentas_pcp, planilhas
 from modulos.nucleo import Max
 
 
@@ -35,6 +36,7 @@ PASTA_USUARIOS = PASTA / "usuarios"
 PASTA_RELATORIOS = PASTA / "relatorios"
 
 LIMITE_MENSAGEM = 4000  # caracteres por pergunta
+LIMITE_ANEXO_MB = 30    # tamanho máximo de uma planilha anexada
 
 # Quantas perguntas o MAX responde ao mesmo tempo. Cada uma fica presa
 # esperando o Gemini (alguns segundos), por isso o limite é separado das
@@ -80,6 +82,7 @@ def _ocupar_vaga():
             _na_fila -= 1
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = LIMITE_ANEXO_MB * 1024 * 1024
 
 
 # ============================================================
@@ -134,6 +137,11 @@ def _assistente(nome, ident):
 @app.errorhandler(500)
 def _erro(erro):
     return jsonify({"erro": getattr(erro, "description", str(erro))}), getattr(erro, "code", 500)
+
+
+@app.errorhandler(413)
+def _grande_demais(erro):
+    return jsonify({"erro": f"A planilha passou de {LIMITE_ANEXO_MB} MB."}), 413
 
 
 # ============================================================
@@ -223,6 +231,102 @@ def painel():
         return jsonify(ferramentas_pcp.painel())
     except Exception as erro:
         return jsonify({"erro": str(erro)}), 500
+
+
+# ============================================================
+# PLANILHAS ANEXADAS PELO CHAT
+# ============================================================
+
+def _pasta_anexos(ident):
+    return PASTA_USUARIOS / ident / "anexos"
+
+
+def _nome_do_anexo(nome):
+    """Nome do arquivo sem pastas nem caracteres que o Windows recusa."""
+    nome = Path(nome.replace("\\", "/")).name
+    nome = re.sub(r'[<>:"/|?*\x00-\x1f]+', "_", nome).strip(" .")
+    pasta, extensao = os.path.splitext(nome)
+    return pasta[:80].strip(" .") + extensao.lower()
+
+
+def _lista_de_anexos(ident):
+    return [p.name for p in planilhas.arquivos_anexos(_pasta_anexos(ident))]
+
+
+def _resumo_do_anexo(nome_arquivo, tabelas):
+    """Texto que o MAX mostra ao receber a planilha (sem gastar o Gemini)."""
+    prefixo = os.path.splitext(nome_arquivo)[0] + " - "   # "Estoque - Planilha1" -> "Planilha1"
+    partes = []
+    for t in tabelas[:8]:
+        aba = t.nome[len(prefixo):] if t.nome.startswith(prefixo) else t.nome
+        colunas = ", ".join(str(c) for c in t.df.columns[:8])
+        if len(t.df.columns) > 8:
+            colunas += f" e mais {len(t.df.columns) - 8}"
+        linhas = "1 linha" if len(t.df) == 1 else f"{len(t.df)} linhas"
+        partes.append(f"{aba}: {linhas}, colunas {colunas}")
+    if len(tabelas) > 8:
+        partes.append(f"e mais {len(tabelas) - 8} abas")
+    abas = "1 aba" if len(tabelas) == 1 else f"{len(tabelas)} abas"
+    return (
+        f"Recebi a planilha {nome_arquivo}, com {abas}.\n"
+        + "\n".join(partes)
+        + "\nO que você quer saber dela? Posso fazer uma análise geral, "
+        "somar, contar, achar os maiores e menores ou exportar uma parte."
+    )
+
+
+@app.get("/api/anexos")
+def anexos():
+    _, ident = _usuario()
+    return jsonify({"anexos": _lista_de_anexos(ident)})
+
+
+@app.post("/api/anexos")
+def anexar():
+    nome, ident = _usuario()
+    arquivo = request.files.get("arquivo")
+    if arquivo is None or not arquivo.filename:
+        abort(400, description="Escolha uma planilha para anexar.")
+    nome_arquivo = _nome_do_anexo(arquivo.filename)
+    extensao = os.path.splitext(nome_arquivo)[1]
+    if extensao == ".xls":
+        abort(400, description=(
+            "Arquivos .xls (Excel antigo) ainda não são lidos. Abra no Excel e "
+            "salve como .xlsx (Arquivo > Salvar como > Pasta de Trabalho do Excel)."
+        ))
+    if extensao not in planilhas.EXTENSOES_ANEXO or len(nome_arquivo) <= len(extensao):
+        abort(400, description="Anexe uma planilha .xlsx, .xlsm ou .csv.")
+
+    pasta = _pasta_anexos(ident)
+    pasta.mkdir(parents=True, exist_ok=True)
+    destino = pasta / nome_arquivo
+    temporario = pasta / f"~enviando_{threading.get_ident()}{extensao}"
+    arquivo.save(temporario)
+    try:
+        tabelas = planilhas.receber_anexo(temporario, destino)
+    except Exception as erro:
+        print(f"[MAX] Anexo de {nome} recusado ({nome_arquivo}): {erro!r}", flush=True)
+        abort(400, description=f"Não consegui ler a planilha {nome_arquivo}: {erro}")
+
+    print(f"[MAX] {nome} anexou {nome_arquivo}.", flush=True)
+    texto = _resumo_do_anexo(nome_arquivo, tabelas)
+    _assistente(nome, ident).registrar_anexo(f"Anexei a planilha {nome_arquivo}.", texto)
+    return jsonify({"texto": texto, "anexos": _lista_de_anexos(ident)})
+
+
+@app.post("/api/anexos/remover")
+def remover_anexo():
+    _, ident = _usuario()
+    nome_arquivo = str((request.get_json(silent=True) or {}).get("nome", ""))
+    caminho = next(
+        (p for p in planilhas.arquivos_anexos(_pasta_anexos(ident)) if p.name == nome_arquivo),
+        None,
+    )
+    if caminho is None:
+        abort(404, description="Essa planilha não está mais anexada.")
+    planilhas.esquecer(caminho)
+    caminho.unlink()
+    return jsonify({"anexos": _lista_de_anexos(ident)})
 
 
 @app.get("/relatorios/<path:arquivo>")

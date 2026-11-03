@@ -19,7 +19,7 @@ from google import genai
 from google.genai import errors as erros_genai
 from google.genai import types
 
-from modulos import ferramentas_pcp
+from modulos import ferramentas_pcp, planilhas
 from modulos.ferramentas_pcp import FERRAMENTAS_PCP, contexto_pcp
 
 # O SDK avisa no terminal que prefere function calling pelo chats.create;
@@ -145,6 +145,7 @@ class Max:
         pasta.mkdir(parents=True, exist_ok=True)
         self.arquivo_historico = pasta / "historico.json"
         self.arquivo_memoria = pasta / "memoria.json"
+        self.pasta_anexos = pasta / "anexos"   # planilhas anexadas pelo chat
         self.nome_usuario = nome_usuario
         self.modo_web = modo_web
 
@@ -206,6 +207,7 @@ class Max:
 
         _log(f"Chamando o Gemini ({MODELO})...")
         _atual.max = self
+        planilhas.usar_anexos(self.pasta_anexos)  # só esta pessoa vê os anexos dela
         try:
             texto = self._consultar_gemini(recente, memoria)
         except Exception as erro:
@@ -213,6 +215,7 @@ class Max:
             raise
         finally:
             _atual.max = None
+            planilhas.usar_anexos(None)
         _log("Resposta recebida!")
 
         with self._trava:
@@ -230,6 +233,17 @@ class Max:
         ).start()
 
         return texto
+
+    def registrar_anexo(self, aviso_usuario, resposta):
+        """Grava no histórico que o usuário anexou uma planilha.
+
+        Assim a conversa mostra o anexo depois de recarregar a página e o
+        Gemini sabe de qual planilha o usuário fala ("a que eu mandei").
+        """
+        with self._trava:
+            self.historico.append({"role": "user", "content": aviso_usuario})
+            self.historico.append({"role": "assistant", "content": resposta})
+            self.salvar_historico()
 
     def _gerar(self, **parametros):
         """generate_content com novas tentativas e modelo reserva.
@@ -333,6 +347,18 @@ class Max:
             "Para perguntas como 'itens com status X', descubra a coluna "
             "certa com listar_abas_planilha (pode se chamar Status, "
             "ANÁLISE, OBSOLETO? etc.) e filtre com consultar_aba.\n"
+            "Planilhas anexadas: o usuário pode anexar planilhas pelo "
+            "chat. As abas delas aparecem na lista abaixo marcadas como "
+            "'anexada pelo usuário', com o nome do arquivo no começo, e "
+            "são lidas com as mesmas ferramentas (listar_abas_planilha, "
+            "consultar_aba, resumir_aba, buscar_na_planilha e as de "
+            "exportar). Quando ele falar da planilha que mandou ou "
+            "anexou, use essas abas. Para uma análise geral de uma "
+            "planilha anexada, veja as colunas com listar_abas_planilha, "
+            "calcule totais, médias e rankings com resumir_aba e aponte "
+            "os destaques (maiores, menores, vazios, fora do padrão). "
+            "Se não houver nenhuma aba anexada e ele falar de uma "
+            "planilha que mandou, diga que ela não está mais anexada.\n"
             "Se uma ferramenta devolver erro com a lista de abas ou "
             "colunas, corrija o nome e tente de novo antes de responder. "
             "Diga de qual aba veio a informação. Se a pergunta servir "

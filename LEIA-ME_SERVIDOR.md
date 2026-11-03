@@ -51,6 +51,7 @@ Salve a nova versão em `dados\ANÁLISE DIÁRIA DE PROGRAMAÇÃO.xlsm` (mesmo no
 - Não tem senha: quem estiver na rede da empresa e souber o nome de outra pessoa consegue ver o histórico dela. Para a rede interna isso costuma bastar. Se precisar de senha, dá para acrescentar depois.
 - A chave do Gemini fica só no seu PC. Quem acessa não tem como vê-la, mas todas as perguntas usam essa chave, então o consumo de todo mundo é somado.
 - Os planos de ação exportados aparecem como um botão **Baixar** embaixo da resposta.
+- Para o MAX analisar uma planilha que não está na pasta `dados\`, clique no **clipe** ao lado da caixa de mensagem (ou arraste o arquivo para a janela). Aceita `.xlsx`, `.xlsm` e `.csv` de até 30 MB. A planilha fica em `usuarios\<nome>\anexos\` e só quem anexou consegue perguntar sobre ela. Para tirar, clique no **×** ao lado do nome do arquivo.
 - O `max.py` (a janela) continua funcionando e pode ficar aberto junto com o servidor. Ele usa o histórico antigo da pasta do projeto, separado do histórico do modo rede.
 - O MAX é só para a rede interna. Não abra a porta 8000 para a internet.
 

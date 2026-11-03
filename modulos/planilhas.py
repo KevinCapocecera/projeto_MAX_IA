@@ -14,13 +14,20 @@ Como cada aba tem um formato, a leitura é automática:
 Quem calcula é sempre o Python (filtros, somas, médias, contagens), com
 os valores da última versão SALVA de cada planilha. Ela só é lida de
 novo quando o arquivo muda.
+
+Planilhas anexadas pelo chat ficam em usuarios/<nome>/anexos e só
+aparecem para quem anexou: o MAX chama usar_anexos(pasta) antes de
+responder, e as abas desses arquivos entram na lista só naquela thread.
+O nome delas começa pelo nome do arquivo ("Estoque - Planilha1").
 """
 
+import io
 import math
+import os
 import re
 import threading
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time
 from pathlib import Path
 
@@ -38,6 +45,7 @@ LIMITE_LINHAS = 100
 LIMITE_COLUNAS = 30
 LIMITE_GRUPOS = 60
 LIMITE_TEXTO = 120
+EXTENSOES_ANEXO = (".xlsx", ".xlsm", ".csv")
 
 
 # ============================================================
@@ -78,6 +86,7 @@ class Tabela:
     arquivo: str
     oculta: bool
     df: pd.DataFrame = field(repr=False)
+    anexo: bool = False
 
 
 def _nome_coluna(valor, indice):
@@ -239,39 +248,135 @@ def arquivos():
     )
 
 
-def _tabelas_do_arquivo(caminho):
+def _ler_csv(caminho):
+    """Tabela de um .csv (separador ; , ou tabulação, como o Excel salva)."""
+    dados = caminho.read_bytes()
+    for codificacao in ("utf-8-sig", "cp1252", "latin-1"):   # latin-1 lê qualquer byte
+        try:
+            texto = dados.decode(codificacao)
+            break
+        except UnicodeDecodeError:
+            continue
+    primeira = texto.split("\n", 1)[0]
+    separador = max([";", ",", "\t"], key=primeira.count)
+    bruto = pd.read_csv(io.StringIO(texto), sep=separador, dtype=str, keep_default_na=False)
+    cabecalho = [None if str(c).startswith("Unnamed:") else c for c in bruto.columns]
+    linhas = [[None if _vazio(v) else v for v in linha] for linha in bruto.values.tolist()]
+    df = _montar_df(cabecalho, linhas)
+
+    # Datas chegam como texto; viram datas para os filtros "entre" e "<".
+    def para_data(valor):
+        data = None if _vazio(valor) else _data_texto(valor)
+        return None if data is None or pd.isna(data) else data.to_pydatetime()
+
+    for coluna in df.columns:
+        preenchidos = df[coluna][~df[coluna].map(_vazio)]
+        if not preenchidos.empty and preenchidos.map(_data_texto).notna().mean() >= 0.8:
+            # dtype=object: continua datetime do Python, como vem do Excel (sem NaT).
+            df[coluna] = pd.Series([para_data(v) for v in df[coluna]], index=df.index, dtype=object)
+    return df
+
+
+def _ler_arquivo(caminho, anexo=False, nome=None):
+    """Tabelas de um arquivo, sem cache. nome: o nome do arquivo para mostrar."""
+    nome = nome or caminho.name
+    if caminho.suffix.lower() == ".csv":
+        return [Tabela(Path(nome).stem, nome, False, _ler_csv(caminho), anexo)]
+
+    wb = load_workbook(caminho, read_only=True, data_only=True)
+    try:
+        tabelas = []
+        for ws in wb.worksheets:
+            try:
+                tabelas.extend(_tabelas_da_aba(ws, nome))
+            except Exception as erro:  # uma aba estranha não derruba as outras
+                print(f"[MAX] Não consegui ler a aba {ws.title!r}: {erro}", flush=True)
+    finally:
+        wb.close()
+    if anexo:
+        for t in tabelas:
+            t.nome = f"{Path(nome).stem} - {t.nome}"
+            t.anexo = True
+    return tabelas
+
+
+def _tabelas_do_arquivo(caminho, anexo=False):
     versao = caminho.stat().st_mtime
     with _trava:
         item = _cache.get(caminho)
         if item and item[0] == versao:
             return item[1]
-        wb = load_workbook(caminho, read_only=True, data_only=True)
-        try:
-            tabelas = []
-            for ws in wb.worksheets:
-                try:
-                    tabelas.extend(_tabelas_da_aba(ws, caminho.name))
-                except Exception as erro:  # uma aba estranha não derruba as outras
-                    print(f"[MAX] Não consegui ler a aba {ws.title!r}: {erro}", flush=True)
-        finally:
-            wb.close()
+        tabelas = _ler_arquivo(caminho, anexo)
         _cache[caminho] = (versao, tabelas)
         return tabelas
 
 
+# ============================================================
+# PLANILHAS ANEXADAS PELO CHAT
+# ============================================================
+
+_anexos = threading.local()
+
+
+def usar_anexos(pasta):
+    """Pasta das planilhas anexadas visíveis nesta thread (None: nenhuma)."""
+    _anexos.pasta = Path(pasta) if pasta else None
+
+
+def arquivos_anexos(pasta):
+    """Planilhas anexadas de uma pessoa (sem as que ainda estão chegando, "~")."""
+    pasta = Path(pasta)
+    if not pasta.is_dir():
+        return []
+    return sorted(
+        p for p in pasta.iterdir()
+        if p.suffix.lower() in EXTENSOES_ANEXO and not p.name.startswith("~")
+    )
+
+
+def receber_anexo(temporario, destino):
+    """Lê a planilha recém-enviada e, se der certo, guarda no lugar dela.
+
+    Se a leitura falhar, apaga o temporário e mantém a versão anterior
+    (se houver). Devolve as tabelas lidas.
+    """
+    try:
+        lidas = _ler_arquivo(temporario, anexo=True, nome=destino.name)
+        if not any(len(t.df) for t in lidas):
+            raise ValueError("não encontrei nenhuma linha com dados")
+    except Exception:
+        temporario.unlink(missing_ok=True)
+        raise
+    os.replace(temporario, destino)
+    with _trava:
+        _cache[destino] = (destino.stat().st_mtime, lidas)
+    return lidas
+
+
+def esquecer(caminho):
+    """Tira um arquivo do cache (ex.: anexo removido)."""
+    with _trava:
+        _cache.pop(Path(caminho), None)
+
+
 def tabelas():
-    """Todas as tabelas de todas as planilhas."""
+    """Todas as tabelas das planilhas da pasta dados e dos anexos desta thread."""
     todas = []
     for caminho in arquivos():
         todas.extend(_tabelas_do_arquivo(caminho))
-    # Mesmo nome de aba em arquivos diferentes: acrescenta o arquivo.
+    pasta = getattr(_anexos, "pasta", None)
+    if pasta:
+        for caminho in arquivos_anexos(pasta):
+            todas.extend(_tabelas_do_arquivo(caminho, anexo=True))
+    # Mesmo nome de aba em arquivos diferentes: acrescenta o arquivo. Usa
+    # cópias, porque as tabelas do cache valem para todas as pessoas.
     contagem = {}
     for t in todas:
         contagem[normalizar(t.nome)] = contagem.get(normalizar(t.nome), 0) + 1
-    for t in todas:
-        if contagem[normalizar(t.nome)] > 1 and "[" not in t.nome:
-            t.nome = f"{t.nome} [{t.arquivo}]"
-    return todas
+    return [
+        replace(t, nome=f"{t.nome} [{t.arquivo}]") if contagem[normalizar(t.nome)] > 1 else t
+        for t in todas
+    ]
 
 
 def resolver_tabela(nome):
@@ -595,6 +700,8 @@ def catalogo():
             item["outras_colunas"] = len(t.df.columns) - 40
         if t.oculta:
             item["oculta"] = True
+        if t.anexo:
+            item["anexada_pelo_usuario"] = True
         if varios_arquivos:
             item["arquivo"] = t.arquivo
         saida.append(item)
