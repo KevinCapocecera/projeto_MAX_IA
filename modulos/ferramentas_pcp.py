@@ -26,7 +26,7 @@ from modulos.base_dados import (
     localizar_planilha,
     normalizar,
 )
-from modulos import planilhas
+from modulos import links, planilhas
 from modulos.plano_acao import calcular_plano, salvar_plano
 
 
@@ -627,6 +627,38 @@ def exportar_resumo_excel(aba: str, filtros: str, agrupar_por: str, calculos: st
 
 
 # ============================================================
+# LINKS DA INTERNET
+# ============================================================
+
+def ler_link(url: str, parte: int) -> dict:
+    """Abre um link da internet e devolve o conteúdo: páginas e planilhas online.
+
+    Use SEMPRE que o usuário mandar um endereço (http..., https..., www...)
+    ou pedir para ler, resumir ou analisar um site. Páginas voltam como
+    texto, em partes. Planilhas (.xlsx, .xlsm, .csv, Google Planilhas ou
+    arquivo do Google Drive) são baixadas e guardadas como planilha
+    anexada do usuário; depois leia com consultar_aba, resumir_aba e as
+    outras ferramentas de planilha.
+
+    Args:
+        url: O endereço completo, como o usuário mandou.
+        parte: Qual parte do texto da página ler, começando em 1. Use 1;
+            use 2, 3... só se a resposta anterior disser que há mais texto.
+
+    Returns:
+        Título e texto da página, ou as abas e colunas da planilha baixada.
+        Em caso de erro, a mensagem para explicar ao usuário.
+    """
+    _log(f"lendo o link {url!r}")
+    try:
+        return links.ler(url, parte)
+    except links.LinkRecusado as erro:
+        return {"erro": str(erro)}
+    except Exception as erro:
+        return {"erro": f"Não consegui abrir o link: {erro}"}
+
+
+# ============================================================
 # QUADRO DA INTERFACE (não é ferramenta do Gemini)
 # ============================================================
 
@@ -663,4 +695,5 @@ FERRAMENTAS_PCP = [
     buscar_na_planilha,
     exportar_consulta_excel,
     exportar_resumo_excel,
+    ler_link,
 ]

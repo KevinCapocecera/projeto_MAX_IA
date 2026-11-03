@@ -323,6 +323,19 @@ def usar_anexos(pasta):
     _anexos.pasta = Path(pasta) if pasta else None
 
 
+def pasta_dos_anexos():
+    """Pasta definida por usar_anexos nesta thread (None se não houver)."""
+    return getattr(_anexos, "pasta", None)
+
+
+def nome_do_anexo(nome):
+    """Nome do arquivo sem pastas nem caracteres que o Windows recusa."""
+    nome = Path(str(nome).replace("\\", "/")).name
+    nome = re.sub(r'[<>:"/|?*\x00-\x1f]+', "_", nome).strip(" .")
+    base, extensao = os.path.splitext(nome)
+    return base[:80].strip(" .") + extensao.lower()
+
+
 def arquivos_anexos(pasta):
     """Planilhas anexadas de uma pessoa (sem as que ainda estão chegando, "~")."""
     pasta = Path(pasta)
@@ -364,7 +377,7 @@ def tabelas():
     todas = []
     for caminho in arquivos():
         todas.extend(_tabelas_do_arquivo(caminho))
-    pasta = getattr(_anexos, "pasta", None)
+    pasta = pasta_dos_anexos()
     if pasta:
         for caminho in arquivos_anexos(pasta):
             todas.extend(_tabelas_do_arquivo(caminho, anexo=True))

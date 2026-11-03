@@ -41,6 +41,7 @@ A mesma conversa funciona de quatro jeitos:
 - **Consulta qualquer aba** da planilha, incluindo as ocultas: filtra, ordena, soma, tira média, conta e agrupa.
 - **Procura um código ou descrição** em todas as abas de uma vez.
 - **Exporta para Excel** o plano de ação de DOH e também qualquer consulta ou resumo de qualquer aba. No site, aparece um botão **Baixar** embaixo da resposta.
+- **Abre links da internet:** mande o endereço na conversa e o MAX lê a página para resumir ou responder. Se o link for de uma planilha (Excel, CSV ou Google Planilhas pública), ele baixa e analisa como se fosse uma planilha anexada.
 - **Lê planilhas anexadas no chat** (`.xlsx`, `.xlsm` ou `.csv`, até 30 MB): clique no clipe ao lado da caixa de mensagem ou arraste o arquivo para a janela. O MAX responde com as abas e colunas que encontrou, e dá para pedir análises, somas, rankings e exportações como em qualquer outra aba. Cada pessoa só vê as próprias planilhas anexadas.
 - **Quadro "Estoque por aba"**, com a situação de cada aba em cores de andon (crítica, alta, média, na meta, sem demanda).
 - **Lembra de cada pessoa:** histórico da conversa e memória de longo prazo separados por usuário.
@@ -269,6 +270,9 @@ Ficam em `modulos/ferramentas_pcp.py`. O Gemini escolhe sozinho qual chamar, at�
 | `buscar_na_planilha(termo)` | Procura um texto em todas as abas |
 | `exportar_consulta_excel(aba, filtros, colunas, ordenar_por)` | Excel com **todas** as linhas da consulta, com todas as colunas se `colunas` vier vazio. Gera `relatorios/Consulta_<ABA>_<data>.xlsx` |
 | `exportar_resumo_excel(aba, filtros, agrupar_por, calculos)` | Excel com os totais por grupo, sem o limite de 60 grupos da conversa. Gera `relatorios/Resumo_<ABA>_<data>.xlsx` |
+| `ler_link(url, parte)` | Abre um link da internet (`modulos/links.py`). Página: devolve o texto, em partes de 15 mil caracteres. Planilha (`.xlsx`, `.xlsm`, `.csv`, Google Planilhas pública ou arquivo do Google Drive): baixa e guarda como planilha anexada da pessoa |
+
+**Links:** o MAX se apresenta aos sites como `MAX-PCP/1.0`. Por isso, sites que não aceitam leitura automática (a Wikipédia, por exemplo) e páginas que pedem login respondem "acesso recusado", e o MAX explica isso ao usuário. Páginas montadas por JavaScript chegam com pouco texto. PDFs ainda não são lidos. Por segurança, links para a rede interna (`localhost`, `192.168...`, `10...`, o nome de outros PCs da empresa) são recusados, para o servidor não servir de ponte até outros computadores. O limite é de 20 segundos por link, 5 MB por página e 30 MB por planilha.
 
 **Formato dos filtros** (em `consultar_aba` e `resumir_aba`), com as condições separadas por `;`:
 
@@ -342,6 +346,7 @@ projeto_MAX_IA/
 │   ├── nucleo.py             Classe Max: prompt, Gemini, histórico e memória
 │   ├── ferramentas_pcp.py    Ferramentas do Gemini e o quadro "Estoque por aba"
 │   ├── planilhas.py          Leitura, filtros e resumos de qualquer aba
+│   ├── links.py              Leitura de links: páginas e planilhas online
 │   ├── base_dados.py         Leitura das abas de análise e filtro do PET
 │   ├── plano_acao.py         Cálculo da prioridade e da necessidade; Excel do plano
 │   ├── assistente.py         Respostas por regras (versão antiga, sem Gemini)

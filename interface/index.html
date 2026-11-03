@@ -1219,6 +1219,7 @@
       definirEstado("falando");
       const msg = adicionarMensagem("assistente", textoResposta);
       adicionarArquivos(msg, resposta && resposta.arquivos);
+      if (api === apiServidor) carregarAnexos();   // um link pode ter virado planilha anexada
       if (voz.ligada) {
         falar(textoResposta, msg.querySelector(".ouvir"));
       } else {

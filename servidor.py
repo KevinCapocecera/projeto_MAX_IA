@@ -241,14 +241,6 @@ def _pasta_anexos(ident):
     return PASTA_USUARIOS / ident / "anexos"
 
 
-def _nome_do_anexo(nome):
-    """Nome do arquivo sem pastas nem caracteres que o Windows recusa."""
-    nome = Path(nome.replace("\\", "/")).name
-    nome = re.sub(r'[<>:"/|?*\x00-\x1f]+', "_", nome).strip(" .")
-    pasta, extensao = os.path.splitext(nome)
-    return pasta[:80].strip(" .") + extensao.lower()
-
-
 def _lista_de_anexos(ident):
     return [p.name for p in planilhas.arquivos_anexos(_pasta_anexos(ident))]
 
@@ -287,7 +279,7 @@ def anexar():
     arquivo = request.files.get("arquivo")
     if arquivo is None or not arquivo.filename:
         abort(400, description="Escolha uma planilha para anexar.")
-    nome_arquivo = _nome_do_anexo(arquivo.filename)
+    nome_arquivo = planilhas.nome_do_anexo(arquivo.filename)
     extensao = os.path.splitext(nome_arquivo)[1]
     if extensao == ".xls":
         abort(400, description=(
