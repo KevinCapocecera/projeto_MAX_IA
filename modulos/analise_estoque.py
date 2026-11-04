@@ -1,16 +1,13 @@
 
 import pandas as pd
-from pathlib import Path
+
+from modulos.base_dados import pasta_dados
 
 
 def carregar_dados():
     """Carrega a planilha de previsão de estoque."""
 
-    arquivo = (
-        Path(__file__).parent.parent
-        / "dados"
-        / "Previsão de Estoque dos Produtos de Festa.xlsx"
-    )
+    arquivo = pasta_dados() / "Previsão de Estoque dos Produtos de Festa.xlsx"
 
     if not arquivo.exists():
         raise FileNotFoundError(

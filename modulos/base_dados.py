@@ -1,8 +1,38 @@
 
+import os
 from pathlib import Path
 import unicodedata
 import pandas as pd
 import math
+
+from dotenv import load_dotenv
+
+
+PASTA_PROJETO = Path(__file__).resolve().parent.parent
+load_dotenv(PASTA_PROJETO / ".env")   # MAX_PASTA_DADOS pode estar lá
+
+
+def pasta_dados():
+    """Onde ficam as planilhas que o MAX lê.
+
+    Por padrão, a pasta dados do projeto. Para usar outra (por exemplo,
+    uma pasta da rede que o PCP atualiza), coloque no .env:
+        MAX_PASTA_DADOS=O:\\copos\\16 - PRODUÇÃO\\05 - PCP BELLO\\BD_MAX
+    """
+    configurada = os.getenv("MAX_PASTA_DADOS", "").strip().strip('"')
+    return Path(configurada) if configurada else PASTA_PROJETO / "dados"
+
+
+def checar_pasta_dados():
+    """Erro claro quando a pasta não abre (ex.: unidade de rede desconectada)."""
+    pasta = pasta_dados()
+    if not pasta.is_dir():
+        raise FileNotFoundError(
+            f"Não consegui abrir a pasta das planilhas: {pasta}. "
+            "Se ela fica na rede, confira se o computador está conectado à rede "
+            "da empresa e se a unidade (ex.: O:) aparece no Explorador de Arquivos."
+        )
+    return pasta
 
 
 def normalizar(texto):
@@ -15,17 +45,17 @@ def normalizar(texto):
 
 
 def localizar_planilha():
-    pasta_dados = Path(__file__).parent.parent / "dados"
+    pasta = checar_pasta_dados()
 
     arquivos = (
-        list(pasta_dados.glob("ANÁLISE DIÁRIA DE PROGRAMAÇÃO.xlsm"))
-        + list(pasta_dados.glob("ANÁLISE DIÁRIA DE PROGRAMAÇÃO.xlsx"))
+        list(pasta.glob("ANÁLISE DIÁRIA DE PROGRAMAÇÃO.xlsm"))
+        + list(pasta.glob("ANÁLISE DIÁRIA DE PROGRAMAÇÃO.xlsx"))
     )
 
     if not arquivos:
         raise FileNotFoundError(
             "Coloque a planilha ANÁLISE DIÁRIA DE PROGRAMAÇÃO "
-            "na pasta dados."
+            f"na pasta {pasta}."
         )
 
     return arquivos[0]

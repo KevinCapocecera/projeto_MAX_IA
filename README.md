@@ -130,6 +130,18 @@ Coloque na pasta **`dados/`**:
 - `ANÁLISE DIÁRIA DE PROGRAMAÇÃO.xlsm` (ou `.xlsx`). É obrigatória para a análise de DOH e o quadro de estoque.
 - Qualquer outra planilha `.xlsx` ou `.xlsm`. O MAX também consegue consultar, por exemplo, a `Previsão de Estoque dos Produtos de Festa.xlsx`.
 
+**Planilhas em outra pasta (por exemplo, na rede):** coloque o caminho no `.env` e reinicie o servidor. O MAX passa a ler de lá, e não mais da pasta `dados/`:
+
+```
+MAX_PASTA_DADOS=O:\copos\16 - PRODUÇÃO\05 - PCP BELLO\BD_MAX
+```
+
+- **Ao ligar o servidor:** a janela mostra de qual pasta o MAX está lendo, ou avisa se não conseguiu abri-la.
+- **Rede fora do ar:** se a rede cair ou a unidade `O:` desconectar, o MAX responde que não conseguiu abrir a pasta e volta a funcionar sozinho quando a rede voltar.
+- **Unidade não conectada ao ligar:** se o servidor ligar junto com o Windows, a unidade `O:` às vezes ainda não conectou. Nesse caso, dá para usar o endereço de rede no lugar da letra: `\\172.25.4.75\Setor$\copos\16 - PRODUÇÃO\05 - PCP BELLO\BD_MAX`.
+- **Só leitura:** o MAX só lê essa pasta. Os planos e consultas exportados continuam em `relatorios/`, e os usuários e senhas continuam em `usuarios/`, na pasta do projeto.
+- **Excel aberto:** quem atualiza a planilha pode deixá-la aberta no Excel. O MAX lê a última versão **salva**.
+
 ---
 
 ## Como usar

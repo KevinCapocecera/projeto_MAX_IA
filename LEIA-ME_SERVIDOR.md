@@ -45,6 +45,8 @@ Você mesmo usa pelo `http://localhost:8000`.
 
 Salve a nova versão em `dados\ANÁLISE DIÁRIA DE PROGRAMAÇÃO.xlsm` (mesmo nome). O MAX percebe sozinho, sem reiniciar.
 
+Se o `.env` tiver `MAX_PASTA_DADOS` (por exemplo `MAX_PASTA_DADOS=O:\copos\16 - PRODUÇÃO\05 - PCP BELLO\BD_MAX`), salve a planilha **nessa pasta**, e não em `dados\`. A janela do servidor mostra, ao ligar, de qual pasta o MAX está lendo.
+
 ## Como funciona
 
 - Cada pessoa entra com **nome e senha**. No primeiro acesso, ela digita o nome, deixa a senha em branco e cria a senha dela (pelo menos 6 caracteres). Isso vale também para quem já usava o MAX antes: o histórico continua o mesmo. Peça para cada colega criar a senha logo, porque, até lá, quem digitar o nome dele cria a senha no lugar dele.

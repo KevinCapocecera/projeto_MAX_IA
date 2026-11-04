@@ -29,7 +29,7 @@ from pathlib import Path
 from flask import Flask, Response, abort, jsonify, request, send_from_directory, session
 from flask.sessions import SecureCookieSessionInterface
 
-from modulos import contas, erp, ferramentas_pcp, planilhas
+from modulos import base_dados, contas, erp, ferramentas_pcp, planilhas
 from modulos.nucleo import Max
 
 
@@ -531,6 +531,11 @@ def main():
     if _manter_acordado():
         print("O computador não vai suspender enquanto esta janela estiver aberta.")
     print(f"Até {simultaneas} perguntas ao mesmo tempo (mude com MAX_SIMULTANEAS no .env).")
+    pasta = base_dados.pasta_dados()
+    if pasta.is_dir():
+        print(f"Planilhas: {pasta}")
+    else:
+        print(f"Planilhas: NÃO consegui abrir {pasta} (confira a rede ou MAX_PASTA_DADOS no .env).")
     if not erp.configurado():
         print("ERP: DESLIGADO (faltam ERP_EMAIL e ERP_SENHA no .env).")
     else:

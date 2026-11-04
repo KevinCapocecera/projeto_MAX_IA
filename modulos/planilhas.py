@@ -1,4 +1,5 @@
-"""Leitura de QUALQUER aba das planilhas da pasta dados.
+"""Leitura de QUALQUER aba das planilhas da pasta dados (ou da pasta em
+MAX_PASTA_DADOS no .env, veja base_dados.pasta_dados).
 
 O MAX usa este módulo para responder perguntas sobre qualquer aba
 (solicitações de compra, apontamentos, base de vendas, fornecedores,
@@ -34,8 +35,9 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
+from modulos.base_dados import checar_pasta_dados
 
-PASTA_DADOS = Path(__file__).resolve().parent.parent / "dados"
+
 PASTA_RELATORIOS = Path(__file__).resolve().parent.parent / "relatorios"
 LIMITE_EXPORTACAO = 100_000   # linhas por arquivo exportado
 
@@ -243,7 +245,7 @@ _trava = threading.Lock()
 def arquivos():
     """Planilhas da pasta dados (sem os temporários "~$" do Excel)."""
     return sorted(
-        p for p in PASTA_DADOS.glob("*.xls[xm]")
+        p for p in checar_pasta_dados().glob("*.xls[xm]")
         if not p.name.startswith("~$")
     )
 
