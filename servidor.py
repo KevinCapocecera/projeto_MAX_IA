@@ -3,10 +3,11 @@
 O seu PC roda este arquivo e os outros acessam pelo endereço que
 aparece na tela, por exemplo http://nome-do-pc:8000.
 
-Cada pessoa entra com o próprio nome e tem histórico e memória
-separados, na pasta usuarios/<nome>. A chave do Gemini e a planilha
-ficam só no servidor; quem acessa nunca vê a chave. As planilhas que
-cada pessoa anexa pelo chat ficam em usuarios/<nome>/anexos e só ela vê.
+Cada pessoa entra com nome e senha (criada no primeiro acesso, veja
+modulos/contas.py) e tem histórico e memória separados, na pasta
+usuarios/<nome>. A chave do Gemini e a planilha ficam só no servidor;
+quem acessa nunca vê a chave. As planilhas que cada pessoa anexa pelo
+chat ficam em usuarios/<nome>/anexos e só ela vê.
 
 Para rodar:
     .venv/Scripts/python servidor.py
@@ -15,18 +16,20 @@ Em outra porta:
 """
 
 import argparse
+import math
 import os
 import re
+import secrets
 import socket
 import sys
 import threading
-import unicodedata
+from datetime import timedelta
 from pathlib import Path
-from urllib.parse import unquote
 
-from flask import Flask, Response, abort, jsonify, request, send_from_directory
+from flask import Flask, Response, abort, jsonify, request, send_from_directory, session
+from flask.sessions import SecureCookieSessionInterface
 
-from modulos import ferramentas_pcp, planilhas
+from modulos import contas, erp, ferramentas_pcp, planilhas
 from modulos.nucleo import Max
 
 
@@ -82,39 +85,108 @@ def _ocupar_vaga():
             _na_fila -= 1
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = LIMITE_ANEXO_MB * 1024 * 1024
+app.config.update(
+    MAX_CONTENT_LENGTH=LIMITE_ANEXO_MB * 1024 * 1024,
+    # Sessão num cookie assinado: a página não lê (HttpOnly) e outros
+    # sites não conseguem usá-lo para mandar perguntas (SameSite).
+    SESSION_COOKIE_NAME="max_sessao",
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+)
+
+
+def _carregar_chave_da_sessao():
+    """A chave que assina os cookies fica em usuarios/.chave_sessao.
+
+    É criada na primeira vez e não muda, para ninguém precisar entrar de
+    novo quando o servidor reinicia. Apagar o arquivo desconecta todos.
+    """
+    if app.secret_key:
+        return
+    arquivo = PASTA_USUARIOS / ".chave_sessao"
+    if not arquivo.exists():
+        PASTA_USUARIOS.mkdir(parents=True, exist_ok=True)
+        arquivo.write_text(secrets.token_hex(32), encoding="utf-8")
+    app.secret_key = arquivo.read_text(encoding="utf-8").strip()
+
+
+class _Sessoes(SecureCookieSessionInterface):
+    """Carrega a chave antes de abrir a sessão (o Flask abre a sessão
+    antes dos before_request, então lá seria tarde demais)."""
+
+    def open_session(self, app_, request_):
+        _carregar_chave_da_sessao()
+        return super().open_session(app_, request_)
+
+
+app.session_interface = _Sessoes()
 
 
 # ============================================================
 # USUÁRIOS
 # ============================================================
-# Sem senha: o nome só serve para separar o histórico de cada pessoa.
-# Cada nome ganha um Max próprio, criado na primeira pergunta e
-# guardado enquanto o servidor estiver ligado.
+# Cada pessoa entra com nome e senha. O nome vira a pasta dela
+# (usuarios/<nome>) e ganha um Max próprio, criado na primeira pergunta
+# e guardado enquanto o servidor estiver ligado.
 
 _assistentes = {}
 _estados = {}
 _trava = threading.Lock()
 
 
-def _identificador(nome):
-    """'João da Silva' -> 'joao_da_silva' (nome da pasta da pessoa)."""
-    sem_acento = "".join(
-        c for c in unicodedata.normalize("NFD", nome)
-        if unicodedata.category(c) != "Mn"
-    )
-    ident = re.sub(r"[^a-z0-9]+", "_", sem_acento.lower()).strip("_")
-    return ident[:40]
+_identificador = contas.identificador   # 'João da Silva' -> 'joao_da_silva'
 
 
 def _usuario():
-    """Lê o nome enviado pela página (cabeçalho X-Usuario)."""
-    nome = unquote(request.headers.get("X-Usuario", "")).strip()
-    nome = re.sub(r"\s+", " ", nome)[:60]
+    """(nome, ident) de quem entrou; 401 se não entrou ou se a senha mudou."""
+    ident, nome = session.get("ident"), session.get("nome")
+    if not ident or not nome or session.get("versao") != contas.versao(PASTA_USUARIOS / ident):
+        session.clear()
+        abort(401, description="Entre com seu nome e senha.")
+    return nome, ident
+
+
+def _nome_digitado():
+    dados = request.get_json(silent=True) or {}
+    nome = re.sub(r"\s+", " ", str(dados.get("nome", ""))).strip()[:60]
     ident = _identificador(nome)
     if not ident:
-        abort(401, description="Informe seu nome para usar o MAX.")
-    return nome, ident
+        abort(400, description="Digite seu nome.")
+    return nome, ident, dados
+
+
+def _abrir_sessao(nome, ident):
+    session.clear()
+    session.permanent = True
+    session.update(ident=ident, nome=nome, versao=contas.versao(PASTA_USUARIOS / ident))
+
+
+def _bloqueio(ident):
+    espera = contas.bloqueado(ident)
+    if espera:
+        minutos = math.ceil(espera / 60)
+        return jsonify({"erro": (
+            f"Muitas senhas erradas seguidas. Espere {minutos} minuto"
+            f"{'s' if minutos > 1 else ''} e tente de novo."
+        )}), 429
+    return None
+
+
+def _deste_pc():
+    """True se a pergunta veio do próprio computador que roda o MAX.
+
+    O ERP usa o login de uma pessoa, então por padrão (ERP_SO_NESTE_PC)
+    ele só responde a quem está neste PC.
+    """
+    ip = request.remote_addr or ""
+    if ip in ("127.0.0.1", "::1"):
+        return True
+    try:
+        meus = {info[4][0] for info in socket.getaddrinfo(socket.gethostname(), None)}
+    except OSError:
+        return False
+    return ip in meus
 
 
 def _assistente(nome, ident):
@@ -134,6 +206,7 @@ def _assistente(nome, ident):
 @app.errorhandler(400)
 @app.errorhandler(401)
 @app.errorhandler(404)
+@app.errorhandler(409)
 @app.errorhandler(500)
 def _erro(erro):
     return jsonify({"erro": getattr(erro, "description", str(erro))}), getattr(erro, "code", 500)
@@ -155,6 +228,75 @@ def pagina():
         "</head>", "<script>window.MAX_SERVIDOR = true;</script>\n</head>", 1
     )
     return Response(html, mimetype="text/html")
+
+
+# ============================================================
+# ENTRADA COM SENHA
+# ============================================================
+
+@app.get("/api/eu")
+def eu():
+    nome, _ = _usuario()
+    return jsonify({"nome": nome})
+
+
+@app.post("/api/entrar")
+def entrar():
+    nome, ident, dados = _nome_digitado()
+    pasta = PASTA_USUARIOS / ident
+    if not contas.tem_senha(pasta):
+        return jsonify({"criar_senha": True, "nome": nome})
+    bloqueio = _bloqueio(ident)
+    if bloqueio:
+        return bloqueio
+    if not contas.conferir(pasta, str(dados.get("senha", ""))):
+        contas.registrar_falha(ident)
+        print(f"[MAX] Senha errada para {nome} (de {request.remote_addr}).", flush=True)
+        return jsonify({"erro": "Nome ou senha incorretos."}), 401
+    contas.limpar_falhas(ident)
+    nome = contas.nome_cadastrado(pasta) or nome
+    _abrir_sessao(nome, ident)
+    return jsonify({"nome": nome})
+
+
+@app.post("/api/criar-senha")
+def criar_senha():
+    nome, ident, dados = _nome_digitado()
+    try:
+        contas.criar_senha(PASTA_USUARIOS / ident, nome, str(dados.get("senha", "")))
+    except contas.SenhaJaExiste as erro:
+        abort(409, description=str(erro))
+    except ValueError as erro:
+        abort(400, description=str(erro))
+    print(f"[MAX] {nome} criou a senha (de {request.remote_addr}).", flush=True)
+    _abrir_sessao(nome, ident)
+    return jsonify({"nome": nome})
+
+
+@app.post("/api/trocar-senha")
+def trocar_senha():
+    nome, ident = _usuario()
+    dados = request.get_json(silent=True) or {}
+    bloqueio = _bloqueio(ident)
+    if bloqueio:
+        return bloqueio
+    pasta = PASTA_USUARIOS / ident
+    if not contas.conferir(pasta, str(dados.get("atual", ""))):
+        contas.registrar_falha(ident)
+        return jsonify({"erro": "A senha atual está errada."}), 400
+    try:
+        contas.trocar_senha(pasta, str(dados.get("nova", "")))
+    except ValueError as erro:
+        abort(400, description=str(erro))
+    contas.limpar_falhas(ident)
+    _abrir_sessao(nome, ident)   # esta sessão continua; as outras caem
+    return jsonify({"nome": nome})
+
+
+@app.post("/api/sair")
+def sair():
+    session.clear()
+    return jsonify({"ok": True})
 
 
 ICONES = {"icone.svg", "icone.ico", "icone-180.png"}
@@ -197,7 +339,7 @@ def perguntar():
         )}), 503
     ferramentas_pcp.comecar_registro_exportacoes()
     try:
-        resposta = max_.responder(texto)
+        resposta = max_.responder(texto, erp_permitido=not erp.so_neste_pc() or _deste_pc())
     except Exception as erro:
         print(f"[MAX] Erro para {nome}: {erro!r}", flush=True)
         return jsonify({"erro": str(erro)}), 500
@@ -227,6 +369,7 @@ def historico():
 
 @app.get("/api/painel")
 def painel():
+    _usuario()
     try:
         return jsonify(ferramentas_pcp.painel())
     except Exception as erro:
@@ -323,6 +466,7 @@ def remover_anexo():
 
 @app.get("/relatorios/<path:arquivo>")
 def baixar(arquivo):
+    _usuario()
     if not re.fullmatch(r"(Plano_Acao_PCP|Consulta|Resumo)[\w\-]*\.xlsx", arquivo):
         abort(404, description="Arquivo não encontrado.")
     return send_from_directory(PASTA_RELATORIOS, arquivo, as_attachment=True)
@@ -387,6 +531,12 @@ def main():
     if _manter_acordado():
         print("O computador não vai suspender enquanto esta janela estiver aberta.")
     print(f"Até {simultaneas} perguntas ao mesmo tempo (mude com MAX_SIMULTANEAS no .env).")
+    if not erp.configurado():
+        print("ERP: DESLIGADO (faltam ERP_EMAIL e ERP_SENHA no .env).")
+    else:
+        lista = os.getenv("ERP_USUARIOS", "").strip() or "ninguém (ERP_USUARIOS está vazio)"
+        onde = "só neste PC" if erp.so_neste_pc() else "em qualquer PC"
+        print(f"ERP: ligado para {lista} ({onde}).")
     print("Para desligar, feche esta janela ou aperte Ctrl+C.\n", flush=True)
 
     from waitress import serve

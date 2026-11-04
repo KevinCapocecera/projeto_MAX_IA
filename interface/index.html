@@ -502,6 +502,16 @@
     background: var(--bolha); color: var(--texto);
   }
   .entrar-caixa input:focus { outline: 2px solid var(--led); outline-offset: 1px; }
+  .entrar-caixa input[hidden], .entrar-caixa .enviar[hidden] { display: none; }
+  .entrar-erro { margin: 0; color: var(--critica); font-size: 0.9375rem; }
+  .entrar-erro[hidden] { display: none; }
+  .entrar-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; }
+  .entrar-links button {
+    padding: 4px; border: 0; background: none; color: var(--texto-suave);
+    font: inherit; text-decoration: underline; cursor: pointer;
+  }
+  .entrar-links button:hover, .entrar-links button:focus-visible { color: var(--texto); }
+  .entrar-links button[hidden] { display: none; }
 
   .msg-arquivos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   .msg-arquivos a {
@@ -627,12 +637,24 @@
 </div>
 
 <div class="entrar" id="entrar" hidden>
-  <form class="entrar-caixa" id="form-entrar">
-    <h2>Bem-vindo ao MAX</h2>
-    <p>Digite seu nome. Ele separa o seu histórico de conversa do das outras pessoas.</p>
-    <input id="nome-usuario" type="text" maxlength="60" autocomplete="name"
-           placeholder="Seu nome" aria-label="Seu nome" required>
-    <button class="enviar" type="submit">Entrar</button>
+  <form class="entrar-caixa" id="form-entrar" novalidate>
+    <h2 id="entrar-titulo">Bem-vindo ao MAX</h2>
+    <p id="entrar-texto">Entre com seu nome e sua senha.</p>
+    <input id="nome-usuario" type="text" maxlength="60" autocomplete="username"
+           placeholder="Seu nome" aria-label="Seu nome">
+    <input id="senha-atual" type="password" autocomplete="current-password"
+           placeholder="Senha atual" aria-label="Senha atual" hidden>
+    <input id="senha" type="password" autocomplete="current-password"
+           placeholder="Senha" aria-label="Senha">
+    <input id="senha-repetir" type="password" autocomplete="new-password"
+           placeholder="Repita a nova senha" aria-label="Repita a nova senha" hidden>
+    <p class="entrar-erro" id="entrar-erro" role="alert" hidden></p>
+    <button class="enviar" type="submit" id="entrar-botao">Entrar</button>
+    <div class="entrar-links">
+      <button type="button" id="link-trocar-senha" hidden>Trocar senha</button>
+      <button type="button" id="link-sair" hidden>Sair</button>
+      <button type="button" id="link-voltar" hidden>Voltar</button>
+    </div>
   </form>
 </div>
 
@@ -666,15 +688,15 @@
 
   /* ============================================================
      SERVIDOR NA REDE (servidor.py)
-     O servidor marca window.MAX_SERVIDOR. Cada pessoa entra com o
-     nome, que vai em todas as chamadas (cabeçalho X-Usuario).
+     O servidor marca window.MAX_SERVIDOR. Cada pessoa entra com nome
+     e senha; a sessão fica num cookie que a página nem consegue ler, e
+     o navegador manda sozinho em todas as chamadas.
      ============================================================ */
   const NO_SERVIDOR = window.MAX_SERVIDOR === true;
-  let usuario = "";
-  try { usuario = localStorage.getItem("max-usuario") || ""; } catch (erro) { /* sem armazenamento */ }
+  let usuario = "";   // nome de quem entrou ("" = ninguém)
 
   async function chamar(caminho, corpo) {
-    const opcoes = { headers: { "X-Usuario": encodeURIComponent(usuario) } };
+    const opcoes = { headers: {} };
     if (corpo instanceof FormData) {
       opcoes.method = "POST";   // arquivo: o navegador monta o Content-Type
       opcoes.body = corpo;
@@ -690,11 +712,19 @@
       throw new Error("Não consegui falar com o servidor do MAX. Ele está ligado?");
     }
     const dados = await resposta.json().catch(() => ({}));
+    if (resposta.status === 401 && usuario && !/^\/api\/(entrar|trocar-senha)/.test(caminho)) {
+      sairDaConta("Sua sessão terminou. Entre de novo.");
+    }
     if (!resposta.ok || dados.erro) throw new Error(dados.erro || `Erro ${resposta.status}`);
     return dados;
   }
 
   const apiServidor = {
+    eu: () => chamar("/api/eu"),
+    entrar: (nome, senha) => chamar("/api/entrar", { nome, senha }),
+    criarSenha: (nome, senha) => chamar("/api/criar-senha", { nome, senha }),
+    trocarSenha: (atual, nova) => chamar("/api/trocar-senha", { atual, nova }),
+    sair: () => chamar("/api/sair", {}),
     perguntar: (texto) => chamar("/api/perguntar", { texto }),
     painel: () => chamar("/api/painel"),
     estado: () => chamar("/api/estado"),
@@ -713,7 +743,7 @@
   /* Devolve a ponte com o Python, ou null no modo demonstração. */
   async function obterApi() {
     if (NO_SERVIDOR) {
-      if (!usuario) throw new Error("Digite seu nome para começar.");
+      if (!usuario) throw new Error("Entre com seu nome e senha para começar.");
       return apiServidor;
     }
     if (apiCompleta()) return apiCompleta();
@@ -1427,7 +1457,7 @@
 
   async function anexar(arquivo) {
     if (!arquivo || ocupada) return;
-    if (!usuario) { pedirNome(); return; }
+    if (!usuario) { mostrarEntrada("entrar"); return; }
     if (!ACEITOS.test(arquivo.name)) {
       adicionarMensagem(
         "assistente",
@@ -1633,7 +1663,7 @@
     }
   }
 
-  /* ---------- Entrada com o nome (só no servidor) ---------- */
+  /* ---------- Entrada com nome e senha (só no servidor) ---------- */
   async function carregarConversa() {
     mensagens.replaceChildren();
     $("vazio").hidden = false;
@@ -1649,13 +1679,114 @@
     const selo = $("selo-usuario");
     selo.textContent = usuario;
     selo.hidden = !usuario;
-    selo.setAttribute("aria-label", `Usuário: ${usuario}. Clique para trocar.`);
+    selo.title = "Trocar senha ou sair";
+    selo.setAttribute("aria-label", `Usuário: ${usuario}. Clique para trocar a senha ou sair.`);
   }
 
-  function pedirNome() {
-    $("nome-usuario").value = usuario;
+  /* A mesma caixa serve para entrar, criar a senha no primeiro acesso,
+     mostrar as opções da conta e trocar a senha. */
+  const MODOS_ENTRADA = {
+    entrar: {
+      titulo: () => "Bem-vindo ao MAX",
+      texto: () => "Entre com seu nome e sua senha. No primeiro acesso, deixe a senha em branco e você cria a sua.",
+      campos: ["nome-usuario", "senha"], botao: "Entrar", links: [],
+    },
+    criar: {
+      titulo: () => "Crie sua senha",
+      texto: () => `Primeiro acesso de ${$("nome-usuario").value.trim()}. Crie uma senha com pelo menos 6 caracteres: ` +
+        "só quem souber a senha vai entrar com esse nome e ver o seu histórico.",
+      campos: ["senha", "senha-repetir"], botao: "Criar senha e entrar", links: ["link-voltar"],
+    },
+    conta: {
+      titulo: () => usuario,
+      texto: () => "Você está usando o MAX com este nome.",
+      campos: [], botao: null, links: ["link-trocar-senha", "link-sair", "link-voltar"],
+    },
+    trocar: {
+      titulo: () => "Trocar senha",
+      texto: () => "Digite a senha atual e a nova, com pelo menos 6 caracteres. Os outros computadores em que você entrou vão pedir a senha nova.",
+      campos: ["senha-atual", "senha", "senha-repetir"], botao: "Trocar senha", links: ["link-voltar"],
+    },
+  };
+  let modoEntrada = "entrar";
+
+  function mostrarErroEntrada(texto) {
+    $("entrar-erro").textContent = texto;
+    $("entrar-erro").hidden = !texto;
+  }
+
+  function mostrarEntrada(modo, aviso = "") {
+    modoEntrada = modo;
+    const m = MODOS_ENTRADA[modo];
+    $("entrar-titulo").textContent = m.titulo();
+    $("entrar-texto").textContent = m.texto();
+    for (const id of ["nome-usuario", "senha-atual", "senha", "senha-repetir"]) {
+      $(id).hidden = !m.campos.includes(id);
+      if (id !== "nome-usuario") $(id).value = "";
+    }
+    const senhaNova = modo === "criar" || modo === "trocar";
+    $("senha").placeholder = senhaNova ? "Nova senha" : "Senha";
+    $("senha").setAttribute("aria-label", $("senha").placeholder);
+    $("senha").autocomplete = senhaNova ? "new-password" : "current-password";
+    $("entrar-botao").hidden = !m.botao;
+    if (m.botao) $("entrar-botao").textContent = m.botao;
+    for (const id of ["link-trocar-senha", "link-sair", "link-voltar"]) $(id).hidden = !m.links.includes(id);
+    mostrarErroEntrada(aviso);
     $("entrar").hidden = false;
-    $("nome-usuario").focus();
+    const foco = m.campos.find((id) => !$(id).value) || m.campos[0];
+    $(foco || m.links[0]).focus();
+  }
+
+  function fecharEntrada() {
+    $("entrar").hidden = true;
+    entrada.focus();
+  }
+
+  /* Volta para a tela de entrada, sem nada da pessoa anterior na tela. */
+  function sairDaConta(aviso = "") {
+    usuario = "";
+    mostrarUsuario();
+    mensagens.replaceChildren();
+    $("vazio").hidden = false;
+    mostrarAnexos([]);
+    mostrarEntrada("entrar", aviso);
+  }
+
+  async function enviarEntrada(e) {
+    e.preventDefault();
+    const nome = $("nome-usuario").value.trim().replace(/\s+/g, " ");
+    const senha = $("senha").value;
+    if (modoEntrada === "entrar" && !nome) return mostrarErroEntrada("Digite seu nome.");
+    if (modoEntrada === "criar" || modoEntrada === "trocar") {
+      if (senha.length < 6) return mostrarErroEntrada("A senha precisa ter pelo menos 6 caracteres.");
+      if (senha !== $("senha-repetir").value) return mostrarErroEntrada("As duas senhas novas não são iguais.");
+    }
+    mostrarErroEntrada("");
+    const botao = $("entrar-botao");
+    botao.disabled = true;
+    try {
+      let resposta;
+      if (modoEntrada === "entrar") {
+        resposta = await apiServidor.entrar(nome, senha);
+        if (resposta.criar_senha) {
+          mostrarEntrada("criar");
+          return;
+        }
+      } else if (modoEntrada === "criar") {
+        resposta = await apiServidor.criarSenha(nome, senha);
+      } else {
+        resposta = await apiServidor.trocarSenha($("senha-atual").value, senha);
+      }
+      const outraPessoa = resposta.nome !== usuario;
+      usuario = resposta.nome;
+      try { localStorage.setItem("max-usuario", usuario); } catch (erro) { /* sem armazenamento */ }
+      fecharEntrada();
+      if (outraPessoa) entrarNoServidor();
+    } catch (erro) {
+      mostrarErroEntrada((erro && erro.message) || String(erro));
+    } finally {
+      botao.disabled = false;
+    }
   }
 
   let servidorIniciado = false;
@@ -1672,16 +1803,15 @@
   }
 
   if (NO_SERVIDOR) {
-    $("form-entrar").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const nome = $("nome-usuario").value.trim().replace(/\s+/g, " ");
-      if (!nome) return;
-      usuario = nome;
-      try { localStorage.setItem("max-usuario", nome); } catch (erro) { /* sem armazenamento */ }
-      $("entrar").hidden = true;
-      entrarNoServidor();
+    $("form-entrar").addEventListener("submit", enviarEntrada);
+    $("selo-usuario").addEventListener("click", () => mostrarEntrada("conta"));
+    $("link-trocar-senha").addEventListener("click", () => mostrarEntrada("trocar"));
+    $("link-sair").addEventListener("click", async () => {
+      try { await apiServidor.sair(); } catch (erro) { /* sai da tela mesmo assim */ }
+      sairDaConta();
     });
-    $("selo-usuario").addEventListener("click", pedirNome);
+    $("link-voltar").addEventListener("click", () => (usuario ? fecharEntrada() : mostrarEntrada("entrar")));
+    try { $("nome-usuario").value = localStorage.getItem("max-usuario") || ""; } catch (erro) { /* sem armazenamento */ }
 
     botaoClipe.hidden = false;
     entrada.placeholder = "Digite sua pergunta ou arraste uma planilha aqui";
@@ -1719,7 +1849,10 @@
       anexar(e.dataTransfer.files[0]);
     });
 
-    if (usuario) entrarNoServidor(); else pedirNome();
+    /* Já entrou antes neste navegador? O cookie da sessão diz. */
+    apiServidor.eu()
+      .then(({ nome }) => { usuario = nome; entrarNoServidor(); })
+      .catch(() => mostrarEntrada("entrar"));
   }
 
   apiPronta.then((api) => {

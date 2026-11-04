@@ -47,8 +47,11 @@ Salve a nova versão em `dados\ANÁLISE DIÁRIA DE PROGRAMAÇÃO.xlsm` (mesmo no
 
 ## Como funciona
 
-- Cada pessoa digita o nome ao entrar. Histórico e memória ficam separados em `usuarios\<nome>\`. O navegador lembra o nome; para trocar, é só clicar no nome no canto de cima.
-- Não tem senha: quem estiver na rede da empresa e souber o nome de outra pessoa consegue ver o histórico dela. Para a rede interna isso costuma bastar. Se precisar de senha, dá para acrescentar depois.
+- Cada pessoa entra com **nome e senha**. No primeiro acesso, ela digita o nome, deixa a senha em branco e cria a senha dela (pelo menos 6 caracteres). Isso vale também para quem já usava o MAX antes: o histórico continua o mesmo. Peça para cada colega criar a senha logo, porque, até lá, quem digitar o nome dele cria a senha no lugar dele.
+- Histórico e memória ficam separados em `usuarios\<nome>\`. O navegador fica conectado por 30 dias. Clicando no nome, no canto de cima, dá para **trocar a senha** ou **sair**.
+- **Esqueceu a senha?** Apague o arquivo `usuarios\<nome>\senha.json` da pessoa. No próximo acesso ela cria uma senha nova; o histórico não se perde.
+- Depois de 5 senhas erradas seguidas, aquele nome fica bloqueado por 5 minutos.
+- A senha não fica guardada em lugar nenhum: o `senha.json` tem só um resumo dela, que não dá para desfazer.
 - A chave do Gemini fica só no seu PC. Quem acessa não tem como vê-la, mas todas as perguntas usam essa chave, então o consumo de todo mundo é somado.
 - Os planos de ação exportados aparecem como um botão **Baixar** embaixo da resposta.
 - Para o MAX analisar uma planilha que não está na pasta `dados\`, clique no **clipe** ao lado da caixa de mensagem (ou arraste o arquivo para a janela). Aceita `.xlsx`, `.xlsm` e `.csv` de até 30 MB. A planilha fica em `usuarios\<nome>\anexos\` e só quem anexou consegue perguntar sobre ela. Para tirar, clique no **×** ao lado do nome do arquivo.

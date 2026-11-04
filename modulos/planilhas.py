@@ -328,6 +328,14 @@ def pasta_dos_anexos():
     return getattr(_anexos, "pasta", None)
 
 
+_extras = threading.local()
+
+
+def usar_extras(funcao):
+    """Função que devolve tabelas a mais nesta thread (as do ERP); None: nenhuma."""
+    _extras.funcao = funcao
+
+
 def nome_do_anexo(nome):
     """Nome do arquivo sem pastas nem caracteres que o Windows recusa."""
     nome = Path(str(nome).replace("\\", "/")).name
@@ -381,6 +389,9 @@ def tabelas():
     if pasta:
         for caminho in arquivos_anexos(pasta):
             todas.extend(_tabelas_do_arquivo(caminho, anexo=True))
+    extras = getattr(_extras, "funcao", None)
+    if extras:
+        todas.extend(extras())
     # Mesmo nome de aba em arquivos diferentes: acrescenta o arquivo. Usa
     # cópias, porque as tabelas do cache valem para todas as pessoas.
     contagem = {}

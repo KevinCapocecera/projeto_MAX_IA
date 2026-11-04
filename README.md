@@ -41,6 +41,7 @@ A mesma conversa funciona de quatro jeitos:
 - **Consulta qualquer aba** da planilha, incluindo as ocultas: filtra, ordena, soma, tira média, conta e agrupa.
 - **Procura um código ou descrição** em todas as abas de uma vez.
 - **Exporta para Excel** o plano de ação de DOH e também qualquer consulta ou resumo de qualquer aba. No site, aparece um botão **Baixar** embaixo da resposta.
+- **Lê o ERP Bellocopo:** baixa sozinho o estoque atual e as quatro previsões (produtos, insumos, produtos de festa e insumos de festa) e responde coisas como "o que vai zerar nas próximas 3 semanas e em que dia". Também consulta **pedidos**: o que tem num pedido e se algum item pode faltar, e quais pedidos têm um produto, por status. Só lê; nunca altera nada no ERP.
 - **Abre links da internet:** mande o endereço na conversa e o MAX lê a página para resumir ou responder. Se o link for de uma planilha (Excel, CSV ou Google Planilhas pública), ele baixa e analisa como se fosse uma planilha anexada.
 - **Lê planilhas anexadas no chat** (`.xlsx`, `.xlsm` ou `.csv`, até 30 MB): clique no clipe ao lado da caixa de mensagem ou arraste o arquivo para a janela. O MAX responde com as abas e colunas que encontrou, e dá para pedir análises, somas, rankings e exportações como em qualquer outra aba. Cada pessoa só vê as próprias planilhas anexadas.
 - **Quadro "Estoque por aba"**, com a situação de cada aba em cores de andon (crítica, alta, média, na meta, sem demanda).
@@ -109,7 +110,14 @@ GEMINI_MODELO_RESERVA=gemini-3.5-flash
 
 # Opcional: quantas perguntas o site responde ao mesmo tempo (padrão 32)
 MAX_SIMULTANEAS=32
+
+# Opcional: ERP Bellocopo (veja "ERP Bellocopo" mais abaixo)
+ERP_EMAIL=seu_email_do_erp
+ERP_SENHA=sua_senha_do_erp
+ERP_USUARIOS=Kevin Pereira
 ```
+
+Depois de mudar o `.env`, feche e abra o servidor de novo.
 
 Quando o Google devolve um erro passageiro (503 de modelo sobrecarregado, 429 de limite por minuto, 500, 502 ou 504), o MAX faz até 3 tentativas no modelo principal, esperando 2 e depois 5 segundos entre elas. Se não der, faz mais 2 tentativas no **modelo reserva**. Só depois disso ele mostra uma mensagem explicando o problema. Para não usar o modelo reserva, deixe `GEMINI_MODELO_RESERVA=` vazio.
 
@@ -270,6 +278,9 @@ Ficam em `modulos/ferramentas_pcp.py`. O Gemini escolhe sozinho qual chamar, at�
 | `buscar_na_planilha(termo)` | Procura um texto em todas as abas |
 | `exportar_consulta_excel(aba, filtros, colunas, ordenar_por)` | Excel com **todas** as linhas da consulta, com todas as colunas se `colunas` vier vazio. Gera `relatorios/Consulta_<ABA>_<data>.xlsx` |
 | `exportar_resumo_excel(aba, filtros, agrupar_por, calculos)` | Excel com os totais por grupo, sem o limite de 60 grupos da conversa. Gera `relatorios/Resumo_<ABA>_<data>.xlsx` |
+| `consultar_pedido_erp(numero)` | Itens de um pedido no ERP (tela Consulta por Pedido): data programada, código, produto, quantidade, estoque na data programada e estoque hoje. Aceita o número com ou sem os zeros do começo |
+| `consultar_pedidos_produto_erp(codigo)` | Pedidos de um produto no ERP (tela Consulta por Produto): data programada, pedido, status e quantidade, com totais por status |
+| `consultar_erp(relatorio)` | Baixa do ERP Bellocopo o `estoque` ou uma previsão (`previsao_produtos`, `previsao_insumos`, `previsao_produtos_festa`, `previsao_insumos_festa`) e devolve o nome da aba (`ERP - ...`) para ler com `consultar_aba` e `resumir_aba` |
 | `ler_link(url, parte)` | Abre um link da internet (`modulos/links.py`). Página: devolve o texto, em partes de 15 mil caracteres. Planilha (`.xlsx`, `.xlsm`, `.csv`, Google Planilhas pública ou arquivo do Google Drive): baixa e guarda como planilha anexada da pessoa |
 
 **Links:** o MAX se apresenta aos sites como `MAX-PCP/1.0`. Por isso, sites que não aceitam leitura automática (a Wikipédia, por exemplo) e páginas que pedem login respondem "acesso recusado", e o MAX explica isso ao usuário. Páginas montadas por JavaScript chegam com pouco texto. PDFs ainda não são lidos. Por segurança, links para a rede interna (`localhost`, `192.168...`, `10...`, o nome de outros PCs da empresa) são recusados, para o servidor não servir de ponte até outros computadores. O limite é de 20 segundos por link, 5 MB por página e 30 MB por planilha.
@@ -294,6 +305,28 @@ Os nomes de aba e de coluna podem ser parciais, por exemplo "solicitações", "f
 
 ---
 
+## ERP Bellocopo
+
+O MAX entra no ERP (`sistema-erp.herokuapp.com`) com o login do `.env` e baixa os mesmos arquivos Excel dos downloads do menu **Inventário**. Fica em `modulos/erp.py`.
+
+| Relatório | De onde vem no ERP | O que tem |
+|---|---|---|
+| `estoque` | Baixar Estoque Atual | Código, Nome, Segmento, Marca, GTIN-13 e Quantidade |
+| `previsao_produtos` | Previsão de Produtos | Código, Produto, Média 4m, Carteira, Pedidos, Separado e o estoque previsto de cada dia |
+| `previsao_insumos` | Previsão de Insumos | Código, Insumo, Média 4m, Carteira e o estoque previsto de cada dia |
+| `previsao_produtos_festa` | Previsão de Produtos de Festa | Igual à de produtos |
+| `previsao_insumos_festa` | Previsão de Insumos de Festa | Igual à de insumos |
+
+**Pedidos:** o MAX também faz as buscas das telas **Consulta por Pedido** (pelo número; `130101` e `00130101` funcionam) e **Consulta por Produto** (pelo código exato; se a pessoa disser o nome, o MAX acha o código no estoque do ERP antes). Ele lê a tabela do resultado, sem a linha de total, e soma os pedidos por status. Segundo o ERP, o **Estoque na Data Programada** considera as caixas reservadas, e o **Estoque Hoje** é o estoque do início do dia; quando o estoque na data programada é negativo, o MAX avisa que o item pode faltar.
+
+- **Só leitura:** as únicas chamadas ao ERP são o login, esses 5 downloads e as 2 buscas de pedidos. A lista fica em `CHAMADAS_PERMITIDAS`, em `modulos/erp.py`, e qualquer outra é recusada pelo próprio código. O MAX nunca usa "Atualizar previsão", "Atualizar Estoques" nem telas que gravem algo.
+- **Previsões:** baixadas com 1 dia anterior e 30 dias para prever, o máximo que o ERP aceita. O MAX acrescenta as colunas **Estoque hoje**, **Estoque em 7, 15 e 30 dias**, **Menor estoque previsto**, **Zera em** (primeiro dia com estoque previsto zero ou negativo) e **Dias até zerar**. Nos produtos, traz também **Segmento** e **Marca** do relatório de estoque.
+- **Números:** o ERP usa ponto decimal (`92.25`); o MAX converte na leitura, para não confundir com o ponto de milhar das planilhas da empresa.
+- **Atualização:** cada relatório é baixado quando alguém pergunta e vale por 10 minutos. Os arquivos ficam em `erp/` (fora do Git). Se a sessão do ERP expirar, o MAX entra de novo sozinho.
+- **Quem pode usar:** só os nomes em `ERP_USUARIOS`, separados por vírgula: o mesmo nome com que a pessoa entra no MAX (maiúsculas, acentos, hífens e apóstrofos não importam; o nome da pasta, como `kevin_pereira`, também serve), e, por padrão, **só em perguntas feitas no próprio PC que roda o MAX** (`ERP_SO_NESTE_PC=1`), porque o MAX entra no ERP com o login de uma pessoa. Para liberar os colegas da lista em outros PCs: peça a quem administra o ERP um usuário só de leitura para o MAX, coloque-o em `ERP_EMAIL` e `ERP_SENHA` e use `ERP_SO_NESTE_PC=0`. Como cada pessoa entra no MAX com a própria senha, ninguém consegue usar o nome de outra. A janela do `max.py` sempre pode.
+
+---
+
 ## Histórico e memória
 
 | | Site (`servidor.py`) | Janela (`max.py`, `janela_chat.py`) |
@@ -301,10 +334,12 @@ Os nomes de aba e de coluna podem ser parciais, por exemplo "solicitações", "f
 | Histórico da conversa | `usuarios/<nome>/historico.json` | `historico.json` |
 | Memória de longo prazo | `usuarios/<nome>/memoria.json` | `memoria.json` |
 | Planilhas anexadas | `usuarios/<nome>/anexos/` | (não tem) |
+| Senha (só o resumo) | `usuarios/<nome>/senha.json` | (não tem) |
 
 - **Histórico:** o Gemini recebe as últimas 12 mensagens. No site, ao entrar, a pessoa vê as últimas 30.
 - **Memória:** depois de cada resposta, o Gemini consolida fatos úteis sobre a pessoa e os projetos, numa lista JSON de `{categoria, conteudo}`. Senhas, chaves e a data do dia não são guardadas. Se a consolidação falhar ou vier vazia, a memória anterior é mantida. A cada pergunta, entram no prompt até 5 memórias com palavras em comum com a pergunta.
 - **Nome da pasta:** o nome digitado vira a pasta, sem acentos, em minúsculas e com `_` no lugar dos espaços. "João Silva" vira `usuarios/joao_silva/`.
+- **Senha:** cada pessoa entra com nome e senha, criada no primeiro acesso (pelo menos 6 caracteres). Fica em `usuarios/<nome>/senha.json` só como um resumo `scrypt` com sal, que não dá para desfazer. A sessão é um cookie assinado com a chave de `usuarios/.chave_sessao` (criada sozinha) e vale 30 dias; trocar a senha derruba as sessões abertas em outros PCs. Depois de 5 senhas erradas seguidas, o nome fica bloqueado por 5 minutos. **Esqueceu a senha?** Apague o `senha.json` da pessoa; ela cria outra no próximo acesso, e o histórico continua.
 - **Levar o histórico da janela para o site:** copie `historico.json` e `memoria.json` para `usuarios/<seu_nome>/` antes de entrar pela primeira vez.
 - **Planilhas anexadas:** ficam guardadas até a pessoa clicar no **×** ao lado do nome, acima da caixa de mensagem. Anexar de novo um arquivo com o mesmo nome troca a versão antiga; se o arquivo novo não abrir, a antiga continua. Na conversa, as abas aparecem com o nome do arquivo no começo (`Estoque outubro - Planilha1`). Um `.csv` vira uma aba só, com o separador (`;`, `,` ou tabulação) e as datas `dd/mm/aaaa` reconhecidos sozinhos. Arquivos `.xls` (Excel antigo) precisam ser salvos como `.xlsx` antes.
 
@@ -347,6 +382,7 @@ projeto_MAX_IA/
 │   ├── ferramentas_pcp.py    Ferramentas do Gemini e o quadro "Estoque por aba"
 │   ├── planilhas.py          Leitura, filtros e resumos de qualquer aba
 │   ├── links.py              Leitura de links: páginas e planilhas online
+│   ├── erp.py                Login e downloads do ERP Bellocopo (estoque e previsões)
 │   ├── base_dados.py         Leitura das abas de análise e filtro do PET
 │   ├── plano_acao.py         Cálculo da prioridade e da necessidade; Excel do plano
 │   ├── assistente.py         Respostas por regras (versão antiga, sem Gemini)
@@ -369,11 +405,16 @@ projeto_MAX_IA/
 
 ## API do servidor
 
-Usada pela página. Cada pessoa é identificada pelo cabeçalho `X-Usuario` (o nome, codificado para URL).
+Usada pela página. Cada pessoa é identificada pela sessão (cookie `max_sessao`, aberto em `/api/entrar` ou `/api/criar-senha`). Tudo abaixo de `/api/` e `/relatorios/`, menos as rotas de entrada, responde **401** sem sessão.
 
 | Método | Caminho | O que faz |
 |---|---|---|
 | GET | `/` | A página (marca `window.MAX_SERVIDOR = true`) |
+| POST | `/api/entrar` | `{"nome", "senha"}` → `{"nome"}` e abre a sessão; `{"criar_senha": true}` se o nome ainda não tem senha; 401 com senha errada; 429 depois de 5 erradas |
+| POST | `/api/criar-senha` | `{"nome", "senha"}` → primeiro acesso: cria a senha e abre a sessão (409 se o nome já tem senha) |
+| POST | `/api/trocar-senha` | `{"atual", "nova"}` → troca a senha; as sessões de outros PCs caem |
+| POST | `/api/sair` | Fecha a sessão |
+| GET | `/api/eu` | `{"nome"}` de quem está na sessão |
 | POST | `/api/perguntar` | `{"texto": "..."}` → `{"texto": resposta, "arquivos": [{"nome", "url"}]}` |
 | GET | `/api/estado` | `{"estado": "consultando"}` enquanto a planilha é lida |
 | GET | `/api/historico` | Últimas 30 mensagens da pessoa |
@@ -429,7 +470,8 @@ O teste de perguntas gasta um pouco da cota do Gemini. Ele não mexe no históri
 ## Segurança e privacidade
 
 - **Chave do Gemini:** a `GEMINI_API_KEY` fica só no `.env` do computador que roda o MAX. Quem acessa pelo navegador não tem como vê-la. Se a chave vazar, gere outra no Google AI Studio.
-- **Sem senha:** o site não tem senha. Quem está na rede da empresa e digita o nome de outra pessoa vê o histórico dela.
+- **Senha:** cada pessoa entra com a própria senha, guardada só como resumo `scrypt`. Até alguém criar a senha, quem digitar o nome dela cria a senha no lugar, então peça aos colegas para criarem logo. O site é `http://`, sem criptografia: dentro da rede da empresa isso costuma bastar, mas a senha passa pela rede como texto.
+- **Login do ERP:** `ERP_EMAIL` e `ERP_SENHA` ficam só no `.env`. Para o ERP, os acessos do MAX aparecem como seus. Por padrão, o ERP só é consultado em perguntas feitas no próprio PC que roda o MAX (veja "ERP Bellocopo").
 - **Só rede interna:** o servidor é feito para a rede interna. Não libere a porta 8000 para a internet.
 - **Consumo compartilhado:** todas as perguntas usam a mesma chave do Gemini, então o consumo de todo mundo é somado.
 - **O que vai para o Gemini:** o conteúdo das conversas e os dados que as ferramentas devolvem (linhas da planilha) são enviados ao Google para gerar as respostas.

@@ -15,6 +15,7 @@ Regras das funções expostas ao Gemini (lista FERRAMENTAS_PCP):
 """
 
 import math
+import re
 import threading
 from datetime import datetime
 
@@ -26,7 +27,7 @@ from modulos.base_dados import (
     localizar_planilha,
     normalizar,
 )
-from modulos import links, planilhas
+from modulos import erp, links, planilhas
 from modulos.plano_acao import calcular_plano, salvar_plano
 
 
@@ -659,6 +660,116 @@ def ler_link(url: str, parte: int) -> dict:
 
 
 # ============================================================
+# ERP BELLOCOPO
+# ============================================================
+
+def _sem_acesso():
+    return {"erro": f"Não dá para consultar o ERP: {erp.motivo_agora()}. Quem cuida do MAX resolve no arquivo .env."}
+
+
+def _do_erp(funcao, *args):
+    """Roda uma consulta ao ERP com a checagem de acesso e as mensagens de erro."""
+    if not erp.liberado_agora():
+        return _sem_acesso()
+    try:
+        return funcao(*args)
+    except erp.ErroERP as erro:
+        return {"erro": str(erro)}
+    except Exception as erro:
+        return {"erro": f"Não consegui ler o ERP: {erro}"}
+
+def _nome_do_relatorio(texto):
+    """'Previsão de Produtos de Festa' -> 'previsao_produtos_festa'."""
+    palavras = [
+        p for p in planilhas.normalizar(texto).lower().replace("_", " ").replace("-", " ").split()
+        if p not in ("de", "da", "do", "das", "dos", "e")
+    ]
+    chave = "_".join(palavras)
+    if chave in erp.RELATORIOS:
+        return chave
+    return f"previsao_{chave}" if f"previsao_{chave}" in erp.RELATORIOS else chave
+
+
+def consultar_erp(relatorio: str) -> dict:
+    """Baixa do ERP Bellocopo o estoque atual ou uma previsão de estoque, para consultar.
+
+    Use para previsão de estoque, ruptura (o que vai faltar ou zerar e
+    quando), estoque atual do ERP, carteira, pedidos e separado. Depois
+    leia a aba devolvida com consultar_aba e resumir_aba. O download leva
+    alguns segundos e vale por 10 minutos.
+
+    Args:
+        relatorio: "estoque" (estoque atual de produtos, com segmento e
+            marca), "previsao_produtos", "previsao_insumos",
+            "previsao_produtos_festa" ou "previsao_insumos_festa".
+
+    Returns:
+        O nome da aba ("ERP - ..."), quantas linhas, as colunas e a hora
+        do download. Em caso de erro, a mensagem para o usuário.
+    """
+    if not erp.liberado_agora():
+        return _sem_acesso()
+    chave = _nome_do_relatorio(relatorio)
+    _log(f"baixando do ERP: {chave}")
+    try:
+        tabela = erp.carregar(chave)
+    except erp.ErroERP as erro:
+        return {"erro": str(erro)}
+    except Exception as erro:
+        return {"erro": f"Não consegui ler o ERP: {erro}"}
+    colunas = [str(c) for c in tabela.df.columns]
+    fixas = [c for c in colunas if not re.fullmatch(r"\d{2}/\d{2}/\d{4}", c)]
+    dias = [c for c in colunas if c not in fixas]
+    resultado = {
+        "aba": tabela.nome,
+        "linhas": len(tabela.df),
+        "colunas": fixas,
+        "baixado": tabela.arquivo,
+        "como_usar": f"Use consultar_aba e resumir_aba com aba=\"{tabela.nome}\".",
+    }
+    if dias:
+        resultado["colunas_de_dia"] = f"{len(dias)} colunas de estoque previsto, de {dias[0]} a {dias[-1]}"
+    return resultado
+
+
+def consultar_pedido_erp(numero: str) -> dict:
+    """Mostra os itens de um pedido no ERP Bellocopo (tela Consulta por Pedido).
+
+    Use quando o usuário citar um número de pedido: o que tem no pedido,
+    quando está programado, se tem estoque para atender.
+
+    Args:
+        numero: Número do pedido, como o usuário disse (ex.: "130101" ou
+            "00130101").
+
+    Returns:
+        Cada item com Data Programada, Código, Produto, Quantidade,
+        Estoque na Data Programada (considera as caixas reservadas) e
+        Estoque Hoje (estoque do início do dia, sem as movimentações de hoje).
+    """
+    _log(f"consultando no ERP o pedido {numero!r}")
+    return _do_erp(erp.consultar_pedido, numero)
+
+
+def consultar_pedidos_produto_erp(codigo: str) -> dict:
+    """Lista os pedidos de um produto no ERP Bellocopo (tela Consulta por Produto).
+
+    Use para saber quais pedidos têm um produto, em que datas estão
+    programados, o status (Análise, Aprovado, Programado, Faturado...) e
+    as quantidades. Precisa do código exato do produto.
+
+    Args:
+        codigo: Código do produto (ex.: "TBFCRC20-50F").
+
+    Returns:
+        Os pedidos (Data Programada, Pedido, Status, Quantidade), a
+        quantidade total e os totais por status.
+    """
+    _log(f"consultando no ERP os pedidos do produto {codigo!r}")
+    return _do_erp(erp.consultar_produto, codigo)
+
+
+# ============================================================
 # QUADRO DA INTERFACE (não é ferramenta do Gemini)
 # ============================================================
 
@@ -696,4 +807,7 @@ FERRAMENTAS_PCP = [
     exportar_consulta_excel,
     exportar_resumo_excel,
     ler_link,
+    consultar_erp,
+    consultar_pedido_erp,
+    consultar_pedidos_produto_erp,
 ]
