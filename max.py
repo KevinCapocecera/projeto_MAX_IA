@@ -48,7 +48,7 @@ class Ponte:
         assistente.ao_mudar_estado = self._mostrar_estado
 
     def perguntar(self, texto):
-        """Envia a pergunta ao MAX e devolve {"texto": resposta}."""
+        """Envia a pergunta à MAX e devolve {"texto": resposta}."""
         return {"texto": self._assistente.responder(texto)}
 
     def painel(self):

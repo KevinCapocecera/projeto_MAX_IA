@@ -6,7 +6,7 @@ o nome como a pessoa escreveu e uma "versão", que muda a cada troca de
 senha e derruba as sessões abertas com a senha antiga.
 
 Primeiro acesso: quem entra com um nome que ainda não tem senha cria a
-senha na hora. Esqueceu a senha? Quem cuida do MAX apaga o senha.json
+senha na hora. Esqueceu a senha? Quem cuida da MAX apaga o senha.json
 da pessoa, e ela cria outra no próximo acesso (o histórico continua).
 
 Depois de TENTATIVAS senhas erradas seguidas, o nome fica bloqueado

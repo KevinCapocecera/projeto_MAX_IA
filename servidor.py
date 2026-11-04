@@ -41,7 +41,7 @@ PASTA_RELATORIOS = PASTA / "relatorios"
 LIMITE_MENSAGEM = 4000  # caracteres por pergunta
 LIMITE_ANEXO_MB = 30    # tamanho máximo de uma planilha anexada
 
-# Quantas perguntas o MAX responde ao mesmo tempo. Cada uma fica presa
+# Quantas perguntas a MAX responde ao mesmo tempo. Cada uma fica presa
 # esperando o Gemini (alguns segundos), por isso o limite é separado das
 # chamadas rápidas da página (LED, quadro, histórico), que ganham
 # VAGAS_RAPIDAS linhas de atendimento só para elas e nunca ficam na fila.
@@ -174,7 +174,7 @@ def _bloqueio(ident):
 
 
 def _deste_pc():
-    """True se a pergunta veio do próprio computador que roda o MAX.
+    """True se a pergunta veio do próprio computador que roda a MAX.
 
     O ERP usa o login de uma pessoa, então por padrão (ERP_SO_NESTE_PC)
     ele só responde a quem está neste PC.
@@ -334,7 +334,7 @@ def perguntar():
         _estados.pop(ident, None)
         print(f"[MAX] Fila cheia: {nome} não conseguiu vaga.", flush=True)
         return jsonify({"erro": (
-            "O MAX está respondendo muitas perguntas ao mesmo tempo. "
+            "A MAX está respondendo muitas perguntas ao mesmo tempo. "
             "Tente de novo em alguns segundos."
         )}), 503
     ferramentas_pcp.comecar_registro_exportacoes()
@@ -389,7 +389,7 @@ def _lista_de_anexos(ident):
 
 
 def _resumo_do_anexo(nome_arquivo, tabelas):
-    """Texto que o MAX mostra ao receber a planilha (sem gastar o Gemini)."""
+    """Texto que a MAX mostra ao receber a planilha (sem gastar o Gemini)."""
     prefixo = os.path.splitext(nome_arquivo)[0] + " - "   # "Estoque - Planilha1" -> "Planilha1"
     partes = []
     for t in tabelas[:8]:
@@ -487,7 +487,7 @@ def _ip_na_rede():
 
 
 def _manter_acordado():
-    """Impede o Windows de suspender enquanto o MAX estiver ligado.
+    """Impede o Windows de suspender enquanto a MAX estiver ligada.
 
     Vale só enquanto esta janela estiver aberta; a tela ainda pode
     apagar. Fechar a tampa do notebook ainda suspende (isso se muda nas

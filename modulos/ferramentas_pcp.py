@@ -1,4 +1,4 @@
-"""Ferramentas de PCP que o MAX pode usar no chat.
+"""Ferramentas de PCP que a MAX pode usar no chat.
 
 O Gemini decide quando chamar cada função (function calling), mas quem
 calcula é o Python, com os mesmos cálculos do plano de ação, direto na
@@ -664,7 +664,7 @@ def ler_link(url: str, parte: int) -> dict:
 # ============================================================
 
 def _sem_acesso():
-    return {"erro": f"Não dá para consultar o ERP: {erp.motivo_agora()}. Quem cuida do MAX resolve no arquivo .env."}
+    return {"erro": f"Não dá para consultar o ERP: {erp.motivo_agora()}. Quem cuida da MAX resolve no arquivo .env."}
 
 
 def _do_erp(funcao, *args):

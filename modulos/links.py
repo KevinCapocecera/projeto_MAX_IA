@@ -1,4 +1,4 @@
-"""Leitura de links para o MAX: páginas da internet e planilhas online.
+"""Leitura de links para a MAX: páginas da internet e planilhas online.
 
 O Gemini chama a ferramenta ler_link (em ferramentas_pcp) quando o
 usuário manda um endereço. Quem baixa e lê é o Python:
@@ -6,7 +6,7 @@ usuário manda um endereço. Quem baixa e lê é o Python:
   em partes de LIMITE_TEXTO caracteres;
 - planilha (.xlsx, .xlsm, .csv, Google Planilhas ou arquivo do Google
   Drive): baixa e guarda como planilha anexada da pessoa, na mesma pasta
-  do clipe. Depois o MAX consulta com consultar_aba e resumir_aba.
+  do clipe. Depois a MAX consulta com consultar_aba e resumir_aba.
 
 Por segurança, links que apontam para a rede interna (localhost,
 192.168..., 10...) são recusados: o servidor fica dentro da empresa e
@@ -34,8 +34,8 @@ LIMITE_TEXTO = 15000                    # caracteres por parte devolvida ao Gemi
 MAX_REDIRECIONAMENTOS = 5
 
 CABECALHOS = {
-    # O MAX se apresenta como ele mesmo. Sites que não aceitam leitura
-    # automática recusam (erro 403) e o MAX explica isso ao usuário.
+    # A MAX se apresenta como ela mesma. Sites que não aceitam leitura
+    # automática recusam (erro 403) e a MAX explica isso ao usuário.
     "User-Agent": "MAX-PCP/1.0 (assistente interno de PCP)",
     "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
 }

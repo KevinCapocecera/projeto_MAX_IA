@@ -1,4 +1,4 @@
-"""Cérebro do MAX, sem nenhuma interface.
+"""Cérebro da MAX, sem nenhuma interface.
 
 Conversa com o Gemini (com as ferramentas de PCP), guarda o histórico e
 consolida a memória de longo prazo. É usado pela janela nova
@@ -45,7 +45,7 @@ MODELO = os.getenv("GEMINI_MODELO", "").strip() or "gemini-3.5-flash-lite"
 MODELO_RESERVA = os.getenv("GEMINI_MODELO_RESERVA", "gemini-3.5-flash").strip()
 
 # Erros passageiros do Google: modelo sobrecarregado (503), limite por
-# minuto (429) e falhas internas (500, 502, 504). Nesses casos o MAX
+# minuto (429) e falhas internas (500, 502, 504). Nesses casos a MAX
 # espera um pouco e tenta de novo; se não der, tenta o modelo reserva.
 CODIGOS_PASSAGEIROS = {429, 500, 502, 503, 504}
 ESPERAS_MODELO = (0, 2, 5)    # segundos antes de cada tentativa no modelo principal
@@ -71,13 +71,17 @@ def _mensagem_indisponivel(erro):
     )
 
 INSTRUCOES = (
-    "Seu nome é MAX. Você é um assistente pessoal "
-    "inteligente, amigável, objetivo e natural. Converse em "
+    "Seu nome é MAX. Você é uma assistente pessoal "
+    "inteligente, amigável, objetiva e natural. Converse em "
     "português brasileiro. Ajude o usuário com o PCP, "
     "programação, tecnologia, organização e ideias. Não afirme "
-    "que executou ações que não realizou. Antes você se chamava "
-    "SEXTA-FEIRA; mensagens antigas do histórico podem usar esse "
-    "nome, mas agora você é o MAX."
+    "que executou ações que não realizou. "
+    "Você é do gênero feminino: fale de si mesma sempre no feminino "
+    "('a MAX', 'estou pronta', 'fiquei contente em ajudar', 'sou a "
+    "assistente'), nunca 'o MAX'. Mensagens antigas do histórico e "
+    "memórias podem chamar você de 'o MAX'; isso mudou, agora é 'a MAX'. "
+    "Antes você se chamava SEXTA-FEIRA; mensagens antigas do histórico "
+    "podem usar esse nome, mas agora você é a MAX."
 )
 
 DIAS_SEMANA = [
@@ -140,7 +144,7 @@ class Max:
         """pasta: onde ficam historico.json e memoria.json desta pessoa
         (padrão: a pasta do projeto, como na versão de uma pessoa só).
         nome_usuario: nome de quem está conversando (vai para o prompt).
-        modo_web: True quando o MAX roda no servidor (servidor.py)."""
+        modo_web: True quando a MAX roda no servidor (servidor.py)."""
         pasta = Path(pasta) if pasta else BASE_DIR
         pasta.mkdir(parents=True, exist_ok=True)
         self.arquivo_historico = pasta / "historico.json"
@@ -187,7 +191,7 @@ class Max:
     # ========================================================
 
     def responder(self, mensagem, erp_permitido=True):
-        """Responde à mensagem e devolve o texto do MAX.
+        """Responde à mensagem e devolve o texto da MAX.
 
         Fica esperando o Gemini, então deve rodar fora da thread da
         interface. Se algo der errado, levanta a exceção para a
@@ -357,7 +361,7 @@ class Max:
             # Sem o ERP, explica o motivo exato em vez de um "não está liberado".
             f"ERP Bellocopo: não dá para consultar nesta conversa porque "
             f"{motivo_erp}. Se o usuário pedir algo do ERP, diga isso com "
-            "essas palavras, avise que quem cuida do MAX resolve, e ofereça "
+            "essas palavras, avise que quem cuida da MAX resolve, e ofereça "
             "o que dá para ver nas planilhas.\n"
             if motivo_erp else ""
         )
@@ -521,7 +525,7 @@ class Max:
 
         try:
             prompt = (
-                "Você é o módulo de memória do MAX.\n"
+                "Você é o módulo de memória da MAX.\n"
                 "Consolide memórias de longo prazo.\n\n"
                 "Regras:\n"
                 "1. Preserve fatos úteis e ainda válidos.\n"

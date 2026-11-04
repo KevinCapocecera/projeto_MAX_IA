@@ -620,7 +620,7 @@
     </button>
     <input type="file" id="arquivo-anexo" accept=".xlsx,.xlsm,.csv" hidden>
     <button class="botao-icone mic" id="mic" type="button" disabled
-            aria-label="Falar com o MAX (a voz chega na próxima etapa)"
+            aria-label="Falar com a MAX (a voz chega na próxima etapa)"
             title="A voz chega na próxima etapa">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -629,7 +629,7 @@
       </svg>
     </button>
     <textarea class="entrada" id="entrada" rows="1"
-              aria-label="Mensagem para o MAX"
+              aria-label="Mensagem para a MAX"
               placeholder="Digite sua pergunta"></textarea>
     <button class="enviar" id="enviar" type="button">Enviar</button>
   </footer>
@@ -638,7 +638,7 @@
 
 <div class="entrar" id="entrar" hidden>
   <form class="entrar-caixa" id="form-entrar" novalidate>
-    <h2 id="entrar-titulo">Bem-vindo ao MAX</h2>
+    <h2 id="entrar-titulo">Boas-vindas à MAX</h2>
     <p id="entrar-texto">Entre com seu nome e sua senha.</p>
     <input id="nome-usuario" type="text" maxlength="60" autocomplete="username"
            placeholder="Seu nome" aria-label="Seu nome">
@@ -709,7 +709,7 @@
     try {
       resposta = await fetch(caminho, opcoes);
     } catch (erro) {
-      throw new Error("Não consegui falar com o servidor do MAX. Ele está ligado?");
+      throw new Error("Não consegui falar com o servidor da MAX. Ele está ligado?");
     }
     const dados = await resposta.json().catch(() => ({}));
     if (resposta.status === 401 && usuario && !/^\/api\/(entrar|trocar-senha)/.test(caminho)) {
@@ -928,9 +928,14 @@
   /* Cada estado é um padrão de brilho (0 a 1) por ponto. */
   const PADROES = {
     pronto(x, y, t) {
+      // Parada: o nome fica aceso, com um brilho que atravessa as letras
+      // devagar (a cada ~9 s) e uma onda bem fraca no fundo.
       const a = 0.5 + 0.5 * Math.sin(x * 0.17 + y * 0.42 - t * 1.1);
       const b = 0.5 + 0.5 * Math.sin(t * 0.5 + x * 0.04);
-      return 0.06 + 0.32 * a * b;
+      if (!letreiro.has(y * COLUNAS + x)) return 0.05 + 0.1 * a * b;
+      const passagem = ((t * 12) % (COLUNAS + 40)) - 20;
+      const brilho = Math.max(0, 1 - Math.abs(x - y * 0.6 - passagem) / 7);
+      return 0.72 + 0.05 * Math.sin(t * 1.3) + 0.23 * brilho;
     },
     pensando(x, y, t) {
       const posicao = ((t * 30) % (COLUNAS + 16)) - 8;
@@ -970,18 +975,19 @@
       return Math.floor(t * 4) % 2 === 0 ? 0.35 + 0.4 * ruido(x, y, 2) : 0.08;
     },
     inicio(x, y, t) {
-      // Abertura: o nome acende da esquerda para a direita e se desfaz.
+      // Abertura: o nome acende da esquerda para a direita e continua
+      // aceso, passando aos poucos para o brilho do estado parado.
       const noNome = letreiro.has(y * COLUNAS + x) && x - inicioNome <= t * (larguraNome / 0.8);
-      if (t < 1.6) return noNome ? 0.95 : 0.05;
+      const aceso = noNome ? 0.95 : 0.05;
+      if (t < 1.6) return aceso;
       const k = Math.min(1, (t - 1.6) / 0.9);
-      if (noNome && ruido(x, y, 3) > k) return 0.95;
-      return 0.05 + (PADROES.pronto(x, y, t) - 0.05) * k;
+      return aceso * (1 - k) + PADROES.pronto(x, y, t) * k;
     },
   };
 
   const TEXTOS_ESTADO = {
     inicio: "Iniciando…",
-    pronto: "Pronto para conversar",
+    pronto: "Pronta para conversar",
     pensando: "Pensando…",
     consultando: "Consultando a planilha…",
     falando: "Respondendo",
@@ -1229,7 +1235,7 @@
     clearTimeout(voltaParaPronto);
     definirEstado("pensando");
 
-    /* No servidor, pergunta a cada meio segundo se o MAX está lendo
+    /* No servidor, pergunta a cada meio segundo se a MAX está lendo
        a planilha, para acender o "consultando" no painel de LED. */
     let acompanhar = null;
     try {
@@ -1498,7 +1504,7 @@
   }
 
   async function removerAnexo(nome) {
-    if (!confirm(`Remover a planilha ${nome}? O MAX deixa de ler esse arquivo.`)) return;
+    if (!confirm(`Remover a planilha ${nome}? A MAX deixa de ler esse arquivo.`)) return;
     try {
       mostrarAnexos((await apiServidor.removerAnexo(nome)).anexos);
     } catch (erro) {
@@ -1687,7 +1693,7 @@
      mostrar as opções da conta e trocar a senha. */
   const MODOS_ENTRADA = {
     entrar: {
-      titulo: () => "Bem-vindo ao MAX",
+      titulo: () => "Boas-vindas à MAX",
       texto: () => "Entre com seu nome e sua senha. No primeiro acesso, deixe a senha em branco e você cria a sua.",
       campos: ["nome-usuario", "senha"], botao: "Entrar", links: [],
     },
@@ -1699,7 +1705,7 @@
     },
     conta: {
       titulo: () => usuario,
-      texto: () => "Você está usando o MAX com este nome.",
+      texto: () => "Você está usando a MAX com este nome.",
       campos: [], botao: null, links: ["link-trocar-senha", "link-sair", "link-voltar"],
     },
     trocar: {

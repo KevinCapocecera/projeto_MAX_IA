@@ -1,5 +1,5 @@
 
-"""Janela antiga (Tkinter) do MAX.
+"""Janela antiga (Tkinter) da MAX.
 
 A interface nova é o max.py. Esta continua aqui como reserva e
 usa o mesmo cérebro (modulos/nucleo.py), então responde do mesmo jeito.
@@ -141,7 +141,7 @@ class MaxChat:
 
         self.status = tk.Label(
             self.janela,
-            text="Pronto para conversar",
+            text="Pronta para conversar",
             font=("Segoe UI", 9),
             fg="#9CA3AF",
             bg="#101827",
@@ -214,7 +214,7 @@ class MaxChat:
         self.botao.configure(state="normal")
         self.entrada.configure(state="normal")
         self.entrada.focus_set()
-        self.status.configure(text="Pronto para conversar")
+        self.status.configure(text="Pronta para conversar")
 
 
 # ============================================================

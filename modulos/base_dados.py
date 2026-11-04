@@ -13,7 +13,7 @@ load_dotenv(PASTA_PROJETO / ".env")   # MAX_PASTA_DADOS pode estar lá
 
 
 def pasta_dados():
-    """Onde ficam as planilhas que o MAX lê.
+    """Onde ficam as planilhas que a MAX lê.
 
     Por padrão, a pasta dados do projeto. Para usar outra (por exemplo,
     uma pasta da rede que o PCP atualiza), coloque no .env:

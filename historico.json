@@ -746,5 +746,13 @@
   {
     "role": "assistant",
     "content": "Consultando a aba BD.ESTOQUE CARTEIRA para o CopoBom Branco 200ml, que corresponde ao código CCBB-200 (COPO PS 200ML BRANCO COPOBOM 25X100UN), a quantidade de estoque registrada na data de ontem, 28/10/2026, foi de 4.343 caixas, Kevin."
+  },
+  {
+    "role": "user",
+    "content": "Max faça uma apresentação de você"
+  },
+  {
+    "role": "assistant",
+    "content": "Olá, Kevin! Eu sou o Max, seu assistente pessoal inteligente aqui na Bellocopo. Fui criado por você para ajudar no dia a dia com o PCP, programação, tecnologia, organização e novas ideias. \n\nConsigo acessar todas as planilhas da nossa base de dados, consultar relatórios e previsões diretamente no ERP Protheus, abrir links da internet e até exportar arquivos em Excel sempre que você precisar. Além disso, estou evoluindo para ajudar no seu projeto de automação em Python para criar solicitações de compra e, quem sabe no futuro, me tornar uma assistente de voz completa.\n\nComo posso te ajudar hoje?"
   }
 ]

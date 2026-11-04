@@ -1,6 +1,6 @@
 """Leitura do ERP Bellocopo (sistema-erp.herokuapp.com): estoque, previsões e pedidos.
 
-O MAX entra no ERP com o login do .env e:
+A MAX entra no ERP com o login do .env e:
 - baixa os mesmos arquivos Excel dos botões de download do menu
   Inventário (estoque e as quatro previsões);
 - faz as buscas das telas "Consulta por Pedido" e "Consulta por
@@ -13,15 +13,15 @@ Configuração no .env:
     ERP_EMAIL=...          login do ERP
     ERP_SENHA=...          senha do ERP
     ERP_USUARIOS=Kevin Pereira, Outra Pessoa
-                           quem pode consultar o ERP pelo MAX (os nomes
+                           quem pode consultar o ERP pela MAX (os nomes
                            digitados ao entrar no site). Sem esta linha,
                            ninguém consulta pelo site. A janela do
                            max.py (uma pessoa só, neste PC) sempre pode.
     ERP_SO_NESTE_PC=1      (padrão) o ERP só responde a perguntas feitas
                            neste computador, porque usa o login de uma
-                           pessoa. Com um usuário do ERP só para o MAX,
+                           pessoa. Com um usuário do ERP só para a MAX,
                            use 0 para liberar quem está em ERP_USUARIOS
-                           em qualquer PC (cada um entra no MAX com a
+                           em qualquer PC (cada um entra na MAX com a
                            própria senha).
     ERP_URL=...            (opcional) outro endereço do ERP
 
@@ -29,7 +29,7 @@ Cada relatório baixado vira uma tabela "ERP - <nome>", lida pelas mesmas
 ferramentas das planilhas (consultar_aba, resumir_aba...). Os arquivos
 ficam na pasta erp/ e são baixados de novo depois de VALIDADE_MINUTOS.
 
-Nas previsões, o MAX acrescenta colunas calculadas a partir do estoque
+Nas previsões, a MAX acrescenta colunas calculadas a partir do estoque
 previsto de cada dia: Estoque hoje, em 7, 15 e 30 dias, Menor estoque
 previsto, Zera em e Dias até zerar. Nos produtos, traz também Segmento e
 Marca do relatório de estoque.
@@ -71,7 +71,7 @@ RELATORIOS = {
 CONSULTA_PEDIDO = "/pedido/consultaPorPedido"     # campo numPedido
 CONSULTA_PRODUTO = "/pedido/consultaPorProduto"   # campo codigo
 
-# Tudo o que o MAX pode pedir ao ERP, além do login. As duas buscas usam
+# Tudo o que a MAX pode pedir ao ERP, além do login. As duas buscas usam
 # POST porque o formulário do ERP é assim, mas só consultam.
 CHAMADAS_PERMITIDAS = {("GET", caminho.split("?")[0]) for _, caminho in RELATORIOS.values()} | {
     ("POST", CONSULTA_PEDIDO),
@@ -92,7 +92,7 @@ def configurado():
 
 
 def liberado_para(nome_usuario):
-    """True se esta pessoa pode consultar o ERP pelo MAX.
+    """True se esta pessoa pode consultar o ERP pela MAX.
 
     nome_usuario None é a janela do max.py, de uma pessoa só neste PC.
     """
@@ -107,7 +107,7 @@ def liberado_para(nome_usuario):
 
 
 def so_neste_pc():
-    """True (padrão): o ERP só vale para perguntas feitas no PC que roda o MAX."""
+    """True (padrão): o ERP só vale para perguntas feitas no PC que roda a MAX."""
     return os.getenv("ERP_SO_NESTE_PC", "1").strip().lower() not in ("0", "nao", "não", "false")
 
 
@@ -122,7 +122,7 @@ def motivo_sem_acesso(nome_usuario, permitido_aqui=True):
     if not liberado_para(nome_usuario):
         return f"o nome {nome_usuario} não está na lista ERP_USUARIOS do arquivo .env"
     if not permitido_aqui:
-        return ("por enquanto o ERP só pode ser consultado no computador que roda o MAX "
+        return ("por enquanto o ERP só pode ser consultado no computador que roda a MAX "
                 "(ERP_SO_NESTE_PC no arquivo .env)")
     return None
 
@@ -180,7 +180,7 @@ def _requisitar(metodo, caminho, dados=None):
     """Resposta do ERP para uma chamada permitida; entra de novo se a sessão tiver expirado."""
     global _cliente
     if (metodo, caminho.split("?")[0]) not in CHAMADAS_PERMITIDAS:
-        raise ErroERP(f"O MAX não tem permissão para {metodo} {caminho} no ERP.")
+        raise ErroERP(f"A MAX não tem permissão para {metodo} {caminho} no ERP.")
     if not configurado():
         raise ErroERP("O ERP não está configurado: faltam ERP_EMAIL e ERP_SENHA no arquivo .env.")
     with _trava_rede:

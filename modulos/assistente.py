@@ -26,7 +26,7 @@ def responder_pergunta(df, pergunta, meta_doh=45):
     pergunta = normalizar(pergunta)
 
     if not pergunta_original:
-        print("Digite uma pergunta para o MAX.")
+        print("Digite uma pergunta para a MAX.")
         return
 
     # Exclui PET das análises, sem modificar a planilha original

@@ -1,8 +1,8 @@
 # MAX — Assistente de PCP
 
-O MAX é um assistente de conversa para o PCP (Planejamento e Controle da Produção). Ele responde em português, com os dados reais da planilha **ANÁLISE DIÁRIA DE PROGRAMAÇÃO**: estoque, DOH, prioridades de produção, solicitações de compra, apontamentos, vendas, fornecedores e qualquer outra aba.
+A MAX é uma assistente de conversa para o PCP (Planejamento e Controle da Produção). Ela responde em português, com os dados reais da planilha **ANÁLISE DIÁRIA DE PROGRAMAÇÃO**: estoque, DOH, prioridades de produção, solicitações de compra, apontamentos, vendas, fornecedores e qualquer outra aba.
 
-Quem conversa é o Gemini, do Google. Os números vêm sempre do Python, que lê a planilha e faz as contas. Por isso o MAX não inventa quantidades.
+Quem conversa é o Gemini, do Google. Os números vêm sempre do Python, que lê a planilha e faz as contas. Por isso a MAX não inventa quantidades.
 
 A mesma conversa funciona de quatro jeitos:
 
@@ -17,7 +17,7 @@ A mesma conversa funciona de quatro jeitos:
 
 ## Sumário
 
-- [O que o MAX faz](#o-que-o-max-faz)
+- [O que a MAX faz](#o-que-a-max-faz)
 - [Como funciona](#como-funciona)
 - [Instalação](#instalação)
 - [Como usar](#como-usar)
@@ -35,15 +35,15 @@ A mesma conversa funciona de quatro jeitos:
 
 ---
 
-## O que o MAX faz
+## O que a MAX faz
 
 - **Análise de DOH por aba** (Fiesta, Talher, Prato, Copo BCO-TRP, Copo colorido): quantos produtos estão abaixo da meta de 45 dias, quais são os mais críticos e quanto falta produzir.
 - **Consulta qualquer aba** da planilha, incluindo as ocultas: filtra, ordena, soma, tira média, conta e agrupa.
 - **Procura um código ou descrição** em todas as abas de uma vez.
 - **Exporta para Excel** o plano de ação de DOH e também qualquer consulta ou resumo de qualquer aba. No site, aparece um botão **Baixar** embaixo da resposta.
 - **Lê o ERP Bellocopo:** baixa sozinho o estoque atual e as quatro previsões (produtos, insumos, produtos de festa e insumos de festa) e responde coisas como "o que vai zerar nas próximas 3 semanas e em que dia". Também consulta **pedidos**: o que tem num pedido e se algum item pode faltar, e quais pedidos têm um produto, por status. Só lê; nunca altera nada no ERP.
-- **Abre links da internet:** mande o endereço na conversa e o MAX lê a página para resumir ou responder. Se o link for de uma planilha (Excel, CSV ou Google Planilhas pública), ele baixa e analisa como se fosse uma planilha anexada.
-- **Lê planilhas anexadas no chat** (`.xlsx`, `.xlsm` ou `.csv`, até 30 MB): clique no clipe ao lado da caixa de mensagem ou arraste o arquivo para a janela. O MAX responde com as abas e colunas que encontrou, e dá para pedir análises, somas, rankings e exportações como em qualquer outra aba. Cada pessoa só vê as próprias planilhas anexadas.
+- **Abre links da internet:** mande o endereço na conversa e a MAX lê a página para resumir ou responder. Se o link for de uma planilha (Excel, CSV ou Google Planilhas pública), ele baixa e analisa como se fosse uma planilha anexada.
+- **Lê planilhas anexadas no chat** (`.xlsx`, `.xlsm` ou `.csv`, até 30 MB): clique no clipe ao lado da caixa de mensagem ou arraste o arquivo para a janela. A MAX responde com as abas e colunas que encontrou, e dá para pedir análises, somas, rankings e exportações como em qualquer outra aba. Cada pessoa só vê as próprias planilhas anexadas.
 - **Quadro "Estoque por aba"**, com a situação de cada aba em cores de andon (crítica, alta, média, na meta, sem demanda).
 - **Lembra de cada pessoa:** histórico da conversa e memória de longo prazo separados por usuário.
 
@@ -75,7 +75,7 @@ A mesma conversa funciona de quatro jeitos:
 3. O Gemini chama uma ferramenta, por exemplo `listar_produtos_pcp(aba="talher", filtro="critica", limite=5)`.
 4. O Python lê a planilha, calcula e devolve os dados ao Gemini.
 5. O Gemini escreve a resposta em texto simples.
-6. Em paralelo, o MAX atualiza a memória de longo prazo daquela pessoa.
+6. Em paralelo, a MAX atualiza a memória de longo prazo daquela pessoa.
 
 Enquanto a planilha está sendo lida, o painel de LED da interface mostra **"Consultando a planilha…"**.
 
@@ -119,7 +119,7 @@ ERP_USUARIOS=Kevin Pereira
 
 Depois de mudar o `.env`, feche e abra o servidor de novo.
 
-Quando o Google devolve um erro passageiro (503 de modelo sobrecarregado, 429 de limite por minuto, 500, 502 ou 504), o MAX faz até 3 tentativas no modelo principal, esperando 2 e depois 5 segundos entre elas. Se não der, faz mais 2 tentativas no **modelo reserva**. Só depois disso ele mostra uma mensagem explicando o problema. Para não usar o modelo reserva, deixe `GEMINI_MODELO_RESERVA=` vazio.
+Quando o Google devolve um erro passageiro (503 de modelo sobrecarregado, 429 de limite por minuto, 500, 502 ou 504), a MAX faz até 3 tentativas no modelo principal, esperando 2 e depois 5 segundos entre elas. Se não der, faz mais 2 tentativas no **modelo reserva**. Só depois disso ele mostra uma mensagem explicando o problema. Para não usar o modelo reserva, deixe `GEMINI_MODELO_RESERVA=` vazio.
 
 O `.env` está no `.gitignore` e **nunca** deve ir para o GitHub.
 
@@ -128,19 +128,19 @@ O `.env` está no `.gitignore` e **nunca** deve ir para o GitHub.
 Coloque na pasta **`dados/`**:
 
 - `ANÁLISE DIÁRIA DE PROGRAMAÇÃO.xlsm` (ou `.xlsx`). É obrigatória para a análise de DOH e o quadro de estoque.
-- Qualquer outra planilha `.xlsx` ou `.xlsm`. O MAX também consegue consultar, por exemplo, a `Previsão de Estoque dos Produtos de Festa.xlsx`.
+- Qualquer outra planilha `.xlsx` ou `.xlsm`. A MAX também consegue consultar, por exemplo, a `Previsão de Estoque dos Produtos de Festa.xlsx`.
 
-**Planilhas em outra pasta (por exemplo, na rede):** coloque o caminho no `.env` e reinicie o servidor. O MAX passa a ler de lá, e não mais da pasta `dados/`:
+**Planilhas em outra pasta (por exemplo, na rede):** coloque o caminho no `.env` e reinicie o servidor. A MAX passa a ler de lá, e não mais da pasta `dados/`:
 
 ```
 MAX_PASTA_DADOS=O:\copos\16 - PRODUÇÃO\05 - PCP BELLO\BD_MAX
 ```
 
-- **Ao ligar o servidor:** a janela mostra de qual pasta o MAX está lendo, ou avisa se não conseguiu abri-la.
-- **Rede fora do ar:** se a rede cair ou a unidade `O:` desconectar, o MAX responde que não conseguiu abrir a pasta e volta a funcionar sozinho quando a rede voltar.
+- **Ao ligar o servidor:** a janela mostra de qual pasta a MAX está lendo, ou avisa se não conseguiu abri-la.
+- **Rede fora do ar:** se a rede cair ou a unidade `O:` desconectar, a MAX responde que não conseguiu abrir a pasta e volta a funcionar sozinha quando a rede voltar.
 - **Unidade não conectada ao ligar:** se o servidor ligar junto com o Windows, a unidade `O:` às vezes ainda não conectou. Nesse caso, dá para usar o endereço de rede no lugar da letra: `\\172.25.4.75\Setor$\copos\16 - PRODUÇÃO\05 - PCP BELLO\BD_MAX`.
-- **Só leitura:** o MAX só lê essa pasta. Os planos e consultas exportados continuam em `relatorios/`, e os usuários e senhas continuam em `usuarios/`, na pasta do projeto.
-- **Excel aberto:** quem atualiza a planilha pode deixá-la aberta no Excel. O MAX lê a última versão **salva**.
+- **Só leitura:** a MAX só lê essa pasta. Os planos e consultas exportados continuam em `relatorios/`, e os usuários e senhas continuam em `usuarios/`, na pasta do projeto.
+- **Excel aberto:** quem atualiza a planilha pode deixá-la aberta no Excel. A MAX lê a última versão **salva**.
 
 ---
 
@@ -173,7 +173,7 @@ O passo a passo completo (firewall, tipo de rede, notebook, ligar junto com o Wi
 ### Janela no próprio PC
 
 ```bash
-.venv/Scripts/python max.py           # janela do MAX
+.venv/Scripts/python max.py           # janela da MAX
 .venv/Scripts/python max.py --debug   # com as ferramentas de desenvolvedor
 ```
 
@@ -223,9 +223,9 @@ Escolha uma aba de análise e depois uma opção: ver os 20 primeiros registros,
 
 Dicas para perguntar:
 
-- **Cite a aba quando souber.** Se a pergunta servir para mais de uma aba (por exemplo, "copo"), o MAX pergunta qual delas você quer.
-- **Pode usar datas relativas.** O MAX recebe a data e a hora do computador a cada pergunta, então entende "ontem" e "últimos 7 dias".
-- **Pode pedir a origem.** O MAX diz de qual aba veio a informação.
+- **Cite a aba quando souber.** Se a pergunta servir para mais de uma aba (por exemplo, "copo"), a MAX pergunta qual delas você quer.
+- **Pode usar datas relativas.** A MAX recebe a data e a hora do computador a cada pergunta, então entende "ontem" e "últimos 7 dias".
+- **Pode pedir a origem.** A MAX diz de qual aba veio a informação.
 
 ---
 
@@ -262,7 +262,7 @@ As exportações de qualquer aba (`Consulta_*.xlsx` e `Resumo_*.xlsx`) mantêm n
 
 ## Como a planilha é lida
 
-O MAX lê a **última versão salva** de cada planilha. Se alguém estiver editando no Excel, as mudanças aparecem para o MAX depois de salvar.
+A MAX lê a **última versão salva** de cada planilha. Se alguém estiver editando no Excel, as mudanças aparecem para a MAX depois de salvar.
 
 - **Cache:** cada planilha só é lida de novo quando o arquivo muda (pela data da última gravação). Trocar a planilha na pasta `dados/`, com o mesmo nome, basta: não precisa reiniciar.
 - **Cabeçalho automático:** em cada aba, o cabeçalho é a linha, entre as primeiras, com mais textos e datas. Datas no cabeçalho viram texto, como `08/2025` (mês) ou `28/10/2026`.
@@ -270,7 +270,7 @@ O MAX lê a **última versão salva** de cada planilha. Se alguém estiver edita
 - **Limpeza:** linhas e colunas totalmente vazias são descartadas. Colunas sem nome viram `Coluna A`, `Coluna B`... Nomes repetidos ganham `(2)`.
 - **Abas formatadas até o fim da planilha:** a leitura para depois de 500 linhas vazias seguidas, para não percorrer 1 milhão de linhas em branco.
 - **Abas ocultas:** também são lidas, e aparecem marcadas como "oculta".
-- **Fórmulas:** o MAX lê o valor calculado que o Excel salvou, não a fórmula.
+- **Fórmulas:** a MAX lê o valor calculado que o Excel salvou, não a fórmula.
 
 ---
 
@@ -295,7 +295,7 @@ Ficam em `modulos/ferramentas_pcp.py`. O Gemini escolhe sozinho qual chamar, at�
 | `consultar_erp(relatorio)` | Baixa do ERP Bellocopo o `estoque` ou uma previsão (`previsao_produtos`, `previsao_insumos`, `previsao_produtos_festa`, `previsao_insumos_festa`) e devolve o nome da aba (`ERP - ...`) para ler com `consultar_aba` e `resumir_aba` |
 | `ler_link(url, parte)` | Abre um link da internet (`modulos/links.py`). Página: devolve o texto, em partes de 15 mil caracteres. Planilha (`.xlsx`, `.xlsm`, `.csv`, Google Planilhas pública ou arquivo do Google Drive): baixa e guarda como planilha anexada da pessoa |
 
-**Links:** o MAX se apresenta aos sites como `MAX-PCP/1.0`. Por isso, sites que não aceitam leitura automática (a Wikipédia, por exemplo) e páginas que pedem login respondem "acesso recusado", e o MAX explica isso ao usuário. Páginas montadas por JavaScript chegam com pouco texto. PDFs ainda não são lidos. Por segurança, links para a rede interna (`localhost`, `192.168...`, `10...`, o nome de outros PCs da empresa) são recusados, para o servidor não servir de ponte até outros computadores. O limite é de 20 segundos por link, 5 MB por página e 30 MB por planilha.
+**Links:** a MAX se apresenta aos sites como `MAX-PCP/1.0`. Por isso, sites que não aceitam leitura automática (a Wikipédia, por exemplo) e páginas que pedem login respondem "acesso recusado", e a MAX explica isso ao usuário. Páginas montadas por JavaScript chegam com pouco texto. PDFs ainda não são lidos. Por segurança, links para a rede interna (`localhost`, `192.168...`, `10...`, o nome de outros PCs da empresa) são recusados, para o servidor não servir de ponte até outros computadores. O limite é de 20 segundos por link, 5 MB por página e 30 MB por planilha.
 
 **Formato dos filtros** (em `consultar_aba` e `resumir_aba`), com as condições separadas por `;`:
 
@@ -319,7 +319,7 @@ Os nomes de aba e de coluna podem ser parciais, por exemplo "solicitações", "f
 
 ## ERP Bellocopo
 
-O MAX entra no ERP (`sistema-erp.herokuapp.com`) com o login do `.env` e baixa os mesmos arquivos Excel dos downloads do menu **Inventário**. Fica em `modulos/erp.py`.
+A MAX entra no ERP (`sistema-erp.herokuapp.com`) com o login do `.env` e baixa os mesmos arquivos Excel dos downloads do menu **Inventário**. Fica em `modulos/erp.py`.
 
 | Relatório | De onde vem no ERP | O que tem |
 |---|---|---|
@@ -329,13 +329,13 @@ O MAX entra no ERP (`sistema-erp.herokuapp.com`) com o login do `.env` e baixa o
 | `previsao_produtos_festa` | Previsão de Produtos de Festa | Igual à de produtos |
 | `previsao_insumos_festa` | Previsão de Insumos de Festa | Igual à de insumos |
 
-**Pedidos:** o MAX também faz as buscas das telas **Consulta por Pedido** (pelo número; `130101` e `00130101` funcionam) e **Consulta por Produto** (pelo código exato; se a pessoa disser o nome, o MAX acha o código no estoque do ERP antes). Ele lê a tabela do resultado, sem a linha de total, e soma os pedidos por status. Segundo o ERP, o **Estoque na Data Programada** considera as caixas reservadas, e o **Estoque Hoje** é o estoque do início do dia; quando o estoque na data programada é negativo, o MAX avisa que o item pode faltar.
+**Pedidos:** a MAX também faz as buscas das telas **Consulta por Pedido** (pelo número; `130101` e `00130101` funcionam) e **Consulta por Produto** (pelo código exato; se a pessoa disser o nome, a MAX acha o código no estoque do ERP antes). Ele lê a tabela do resultado, sem a linha de total, e soma os pedidos por status. Segundo o ERP, o **Estoque na Data Programada** considera as caixas reservadas, e o **Estoque Hoje** é o estoque do início do dia; quando o estoque na data programada é negativo, a MAX avisa que o item pode faltar.
 
-- **Só leitura:** as únicas chamadas ao ERP são o login, esses 5 downloads e as 2 buscas de pedidos. A lista fica em `CHAMADAS_PERMITIDAS`, em `modulos/erp.py`, e qualquer outra é recusada pelo próprio código. O MAX nunca usa "Atualizar previsão", "Atualizar Estoques" nem telas que gravem algo.
-- **Previsões:** baixadas com 1 dia anterior e 30 dias para prever, o máximo que o ERP aceita. O MAX acrescenta as colunas **Estoque hoje**, **Estoque em 7, 15 e 30 dias**, **Menor estoque previsto**, **Zera em** (primeiro dia com estoque previsto zero ou negativo) e **Dias até zerar**. Nos produtos, traz também **Segmento** e **Marca** do relatório de estoque.
-- **Números:** o ERP usa ponto decimal (`92.25`); o MAX converte na leitura, para não confundir com o ponto de milhar das planilhas da empresa.
-- **Atualização:** cada relatório é baixado quando alguém pergunta e vale por 10 minutos. Os arquivos ficam em `erp/` (fora do Git). Se a sessão do ERP expirar, o MAX entra de novo sozinho.
-- **Quem pode usar:** só os nomes em `ERP_USUARIOS`, separados por vírgula: o mesmo nome com que a pessoa entra no MAX (maiúsculas, acentos, hífens e apóstrofos não importam; o nome da pasta, como `kevin_pereira`, também serve), e, por padrão, **só em perguntas feitas no próprio PC que roda o MAX** (`ERP_SO_NESTE_PC=1`), porque o MAX entra no ERP com o login de uma pessoa. Para liberar os colegas da lista em outros PCs: peça a quem administra o ERP um usuário só de leitura para o MAX, coloque-o em `ERP_EMAIL` e `ERP_SENHA` e use `ERP_SO_NESTE_PC=0`. Como cada pessoa entra no MAX com a própria senha, ninguém consegue usar o nome de outra. A janela do `max.py` sempre pode.
+- **Só leitura:** as únicas chamadas ao ERP são o login, esses 5 downloads e as 2 buscas de pedidos. A lista fica em `CHAMADAS_PERMITIDAS`, em `modulos/erp.py`, e qualquer outra é recusada pelo próprio código. A MAX nunca usa "Atualizar previsão", "Atualizar Estoques" nem telas que gravem algo.
+- **Previsões:** baixadas com 1 dia anterior e 30 dias para prever, o máximo que o ERP aceita. A MAX acrescenta as colunas **Estoque hoje**, **Estoque em 7, 15 e 30 dias**, **Menor estoque previsto**, **Zera em** (primeiro dia com estoque previsto zero ou negativo) e **Dias até zerar**. Nos produtos, traz também **Segmento** e **Marca** do relatório de estoque.
+- **Números:** o ERP usa ponto decimal (`92.25`); a MAX converte na leitura, para não confundir com o ponto de milhar das planilhas da empresa.
+- **Atualização:** cada relatório é baixado quando alguém pergunta e vale por 10 minutos. Os arquivos ficam em `erp/` (fora do Git). Se a sessão do ERP expirar, a MAX entra de novo sozinha.
+- **Quem pode usar:** só os nomes em `ERP_USUARIOS`, separados por vírgula: o mesmo nome com que a pessoa entra na MAX (maiúsculas, acentos, hífens e apóstrofos não importam; o nome da pasta, como `kevin_pereira`, também serve), e, por padrão, **só em perguntas feitas no próprio PC que roda a MAX** (`ERP_SO_NESTE_PC=1`), porque a MAX entra no ERP com o login de uma pessoa. Para liberar os colegas da lista em outros PCs: peça a quem administra o ERP um usuário só de leitura para a MAX, coloque-o em `ERP_EMAIL` e `ERP_SENHA` e use `ERP_SO_NESTE_PC=0`. Como cada pessoa entra na MAX com a própria senha, ninguém consegue usar o nome de outra. A janela do `max.py` sempre pode.
 
 ---
 
@@ -361,15 +361,15 @@ O MAX entra no ERP (`sistema-erp.herokuapp.com`) com o login do `.env` e baixa o
 
 Fica em `interface/index.html`, num arquivo só, com HTML, CSS e JavaScript.
 
-- **Painel de LED (72 × 17)** mostra o estado do MAX: *Iniciando* (o nome MAX acende), *Pronto*, *Pensando*, *Consultando a planilha*, *Respondendo* e *Erro*. Cada nível de brilho é desenhado uma vez só e copiado, e só os LEDs que mudaram são redesenhados. Assim ele roda a 60 quadros por segundo mesmo em PCs fracos, e cai sozinho para 30 se o PC não der conta.
+- **Painel de LED (72 × 17)** mostra o estado da MAX: *Iniciando* (o nome MAX acende), *Pronta* (o nome MAX fica aceso, com um brilho passando devagar pelas letras), *Pensando*, *Consultando a planilha*, *Respondendo* e *Erro*. Cada nível de brilho é desenhado uma vez só e copiado, e só os LEDs que mudaram são redesenhados. Assim ele roda a 60 quadros por segundo mesmo em PCs fracos, e cai sozinho para 30 se o PC não der conta.
 - **Quadro "Estoque por aba"** mostra os dados reais da planilha e é atualizado a cada resposta e a cada 2 minutos. Clicar numa aba faz a pergunta sobre ela.
 - **Ícone da aba:** um "M" aceso num pedaço do painel de LED. Ele está embutido no `index.html`, então aparece também na janela e no modo demonstração. Os arquivos ficam em `interface/icone.*`.
-- **Voz:** o botão de alto-falante no topo faz o MAX ler cada resposta em voz alta assim que ela chega. Ele começa desligado, e cada navegador lembra a escolha. O botão **Ouvir** de cada resposta lê só aquela, mesmo com a voz desligada, e vira **Parar** enquanto fala. A voz é a do próprio navegador (grátis, sem gastar o Gemini), em português do Brasil e de preferência feminina: Francisca no Edge, Google português no Chrome ou Maria no Windows. A fala é dividida frase por frase, sem os links. Enquanto o MAX fala, o painel de LED fica no estado *Falando*, e uma pergunta nova interrompe a fala.
+- **Voz:** o botão de alto-falante no topo faz a MAX ler cada resposta em voz alta assim que ela chega. Ele começa desligado, e cada navegador lembra a escolha. O botão **Ouvir** de cada resposta lê só aquela, mesmo com a voz desligada, e vira **Parar** enquanto fala. A voz é a do próprio navegador (grátis, sem gastar o Gemini), em português do Brasil e de preferência feminina: Francisca no Edge, Google português no Chrome ou Maria no Windows. A fala é dividida frase por frase, sem os links. Enquanto a MAX fala, o painel de LED fica no estado *Falando*, e uma pergunta nova interrompe a fala.
 - **Tema claro e escuro:** segue o Windows, com um botão para trocar.
 - **Celular:** a página se ajusta à tela.
 - **Medidor de desempenho:** abra o endereço com `?fps` no fim (`http://nome-do-pc:8000/?fps`) para ver quadros por segundo e o tempo de desenho de cada quadro.
 - **Modo demonstração:** aberto direto do arquivo, sem servidor nem pywebview, o `index.html` responde só a algumas perguntas de exemplo, com os números de 19/10.
-- **Botão do microfone:** está desativado, porque falar com o MAX por voz é uma etapa futura (veja os testes de áudio).
+- **Botão do microfone:** está desativado, porque falar com a MAX por voz é uma etapa futura (veja os testes de áudio).
 
 ---
 
@@ -402,12 +402,12 @@ projeto_MAX_IA/
 │
 ├── interface/
 │   ├── index.html            Interface atual (painel de LED, chat e quadro)
-│   ├── icone.svg             Ícone do MAX ("M" no painel de LED)
+│   ├── icone.svg             Ícone da MAX ("M" no painel de LED)
 │   ├── icone.ico             Mesmo ícone para o Windows (16 a 256 px)
 │   ├── icone-180.png         Ícone para a tela inicial do celular
 │   └── interface.css         Estilos antigos (o index.html não usa)
 │
-├── dados/                    Planilhas lidas pelo MAX
+├── dados/                    Planilhas lidas pela MAX
 ├── relatorios/               Planos de ação exportados
 ├── usuarios/                 Histórico, memória e planilhas anexadas de cada pessoa (criada pelo servidor)
 └── testes/                   Testes do Gemini, das planilhas e do microfone
@@ -432,15 +432,15 @@ Usada pela página. Cada pessoa é identificada pela sessão (cookie `max_sessao
 | GET | `/api/historico` | Últimas 30 mensagens da pessoa |
 | GET | `/api/painel` | Resumo das abas para o quadro "Estoque por aba" |
 | GET | `/relatorios/<arquivo>` | Baixa um arquivo exportado (só `Plano_Acao_PCP*.xlsx`, `Consulta*.xlsx` e `Resumo*.xlsx`) |
-| GET | `/favicon.ico`, `/icones/<arquivo>` | Ícones do MAX (`icone.svg`, `icone.ico`, `icone-180.png`) |
+| GET | `/favicon.ico`, `/icones/<arquivo>` | Ícones da MAX (`icone.svg`, `icone.ico`, `icone-180.png`) |
 
 **Limites:**
 
 - **Tamanho da pergunta:** até 4.000 caracteres.
 - **Perguntas ao mesmo tempo:** até **32** (`MAX_SIMULTANEAS` no `.env`, ou `--simultaneas 50` ao ligar).
-- **Fila:** as perguntas que chegam com tudo ocupado esperam numa fila do mesmo tamanho, por até 90 s. Com a fila cheia, a pessoa recebe na hora a mensagem "O MAX está respondendo muitas perguntas ao mesmo tempo. Tente de novo em alguns segundos."
+- **Fila:** as perguntas que chegam com tudo ocupado esperam numa fila do mesmo tamanho, por até 90 s. Com a fila cheia, a pessoa recebe na hora a mensagem "A MAX está respondendo muitas perguntas ao mesmo tempo. Tente de novo em alguns segundos."
 - **Página:** o servidor reserva 8 linhas de atendimento só para as chamadas rápidas (página, LED, quadro e histórico). Assim a página continua respondendo mesmo com tudo ocupado.
-- **Limite do Gemini:** a chave também tem um limite de pedidos por minuto, definido pelo Google conforme o plano. Se ele for atingido, o MAX tenta de novo e usa o modelo reserva (erro 429).
+- **Limite do Gemini:** a chave também tem um limite de pedidos por minuto, definido pelo Google conforme o plano. Se ele for atingido, a MAX tenta de novo e usa o modelo reserva (erro 429).
 
 ---
 
@@ -467,11 +467,11 @@ O teste de perguntas gasta um pouco da cota do Gemini. Ele não mexe no históri
 |---|---|
 | `iniciar_servidor.bat` diz "O sistema não pode encontrar o caminho especificado" | O `.bat` foi aberto fora da pasta do projeto, ou a `.venv` não existe. Abra o `.bat` de dentro de `projeto_MAX_IA`. |
 | Funciona no `localhost`, mas os colegas não conseguem abrir | Firewall ou rede marcada como "Pública" no Windows. Veja o [LEIA-ME_SERVIDOR.md](LEIA-ME_SERVIDOR.md). |
-| "O Gemini está sobrecarregado agora (erro 503 do Google)" | O modelo do Google está com muita procura. O MAX já tentou de novo e usou o modelo reserva. Costuma passar em minutos: pergunte de novo. |
+| "O Gemini está sobrecarregado agora (erro 503 do Google)" | O modelo do Google está com muita procura. A MAX já tentou de novo e usou o modelo reserva. Costuma passar em minutos: pergunte de novo. |
 | "O limite de uso do Gemini foi atingido (erro 429)" | Muitas perguntas por minuto, ou a cota do dia acabou. Espere um pouco. Se acontecer sempre, veja a cota no Google AI Studio. |
 | "Não encontrei GEMINI_API_KEY no arquivo .env" | Crie o `.env` na raiz do projeto com `GEMINI_API_KEY=...`. |
 | "Coloque a planilha ANÁLISE DIÁRIA DE PROGRAMAÇÃO na pasta dados" | O nome do arquivo precisa ser exatamente esse, com os acentos, em `.xlsm` ou `.xlsx`. |
-| O MAX não vê uma mudança recente na planilha | Salve a planilha no Excel. O MAX lê a última versão salva. |
+| A MAX não vê uma mudança recente na planilha | Salve a planilha no Excel. A MAX lê a última versão salva. |
 | Mudei um arquivo `.py` e nada mudou | Reinicie o servidor. Mudanças só no `index.html` aparecem ao recarregar a página com Ctrl+F5. |
 | Animação travando num PC | Abra `/?fps` e veja os números. Confira também se a aceleração de hardware do navegador está ligada. |
 | "Erro ao salvar histórico" | O OneDrive pode estar segurando o arquivo durante a sincronização. Uma opção é mover o projeto para fora do OneDrive (ex.: `C:\MAX`). |
@@ -481,9 +481,9 @@ O teste de perguntas gasta um pouco da cota do Gemini. Ele não mexe no históri
 
 ## Segurança e privacidade
 
-- **Chave do Gemini:** a `GEMINI_API_KEY` fica só no `.env` do computador que roda o MAX. Quem acessa pelo navegador não tem como vê-la. Se a chave vazar, gere outra no Google AI Studio.
+- **Chave do Gemini:** a `GEMINI_API_KEY` fica só no `.env` do computador que roda a MAX. Quem acessa pelo navegador não tem como vê-la. Se a chave vazar, gere outra no Google AI Studio.
 - **Senha:** cada pessoa entra com a própria senha, guardada só como resumo `scrypt`. Até alguém criar a senha, quem digitar o nome dela cria a senha no lugar, então peça aos colegas para criarem logo. O site é `http://`, sem criptografia: dentro da rede da empresa isso costuma bastar, mas a senha passa pela rede como texto.
-- **Login do ERP:** `ERP_EMAIL` e `ERP_SENHA` ficam só no `.env`. Para o ERP, os acessos do MAX aparecem como seus. Por padrão, o ERP só é consultado em perguntas feitas no próprio PC que roda o MAX (veja "ERP Bellocopo").
+- **Login do ERP:** `ERP_EMAIL` e `ERP_SENHA` ficam só no `.env`. Para o ERP, os acessos da MAX aparecem como seus. Por padrão, o ERP só é consultado em perguntas feitas no próprio PC que roda a MAX (veja "ERP Bellocopo").
 - **Só rede interna:** o servidor é feito para a rede interna. Não libere a porta 8000 para a internet.
 - **Consumo compartilhado:** todas as perguntas usam a mesma chave do Gemini, então o consumo de todo mundo é somado.
 - **O que vai para o Gemini:** o conteúdo das conversas e os dados que as ferramentas devolvem (linhas da planilha) são enviados ao Google para gerar as respostas.

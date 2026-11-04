@@ -1,5 +1,5 @@
 @echo off
-REM Liga o MAX na rede da empresa. Deixe esta janela aberta.
+REM Liga a MAX na rede da empresa. Deixe esta janela aberta.
 chcp 65001 >nul
 cd /d "%~dp0"
 

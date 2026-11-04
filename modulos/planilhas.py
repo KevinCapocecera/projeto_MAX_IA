@@ -1,7 +1,7 @@
 """Leitura de QUALQUER aba das planilhas da pasta dados (ou da pasta em
 MAX_PASTA_DADOS no .env, veja base_dados.pasta_dados).
 
-O MAX usa este módulo para responder perguntas sobre qualquer aba
+A MAX usa este módulo para responder perguntas sobre qualquer aba
 (solicitações de compra, apontamentos, base de vendas, fornecedores,
 estoque e carteira...), não só a análise de DOH.
 
@@ -17,7 +17,7 @@ os valores da última versão SALVA de cada planilha. Ela só é lida de
 novo quando o arquivo muda.
 
 Planilhas anexadas pelo chat ficam em usuarios/<nome>/anexos e só
-aparecem para quem anexou: o MAX chama usar_anexos(pasta) antes de
+aparecem para quem anexou: a MAX chama usar_anexos(pasta) antes de
 responder, e as abas desses arquivos entram na lista só naquela thread.
 O nome delas começa pelo nome do arquivo ("Estoque - Planilha1").
 """
