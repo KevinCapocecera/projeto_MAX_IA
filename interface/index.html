@@ -611,14 +611,14 @@
   <footer class="compor">
     <div class="anexos" id="anexos" hidden aria-label="Planilhas anexadas"></div>
     <button class="botao-icone clipe" id="clipe" type="button" hidden
-            aria-label="Anexar planilha (.xlsx, .xlsm ou .csv)"
-            title="Anexar planilha (.xlsx, .xlsm ou .csv)">
+            aria-label="Anexar planilha (.xlsx, .xlsm ou .csv) ou PDF"
+            title="Anexar planilha (.xlsx, .xlsm ou .csv) ou PDF">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
       </svg>
     </button>
-    <input type="file" id="arquivo-anexo" accept=".xlsx,.xlsm,.csv" hidden>
+    <input type="file" id="arquivo-anexo" accept=".xlsx,.xlsm,.csv,.pdf" hidden>
     <button class="botao-icone mic" id="mic" type="button" disabled
             aria-label="Falar com a MAX (a voz chega na próxima etapa)"
             title="A voz chega na próxima etapa">
@@ -1430,7 +1430,7 @@
      servidor, que lê, guarda em usuarios/<nome>/anexos e responde com
      um resumo das abas. Cada pessoa só vê as próprias planilhas.
      ============================================================ */
-  const ACEITOS = /\.(xlsx|xlsm|csv)$/i;
+  const ACEITOS = /\.(xlsx|xlsm|csv|pdf)$/i;
   const botaoClipe = $("clipe");
   const escolherArquivo = $("arquivo-anexo");
 
@@ -1447,7 +1447,7 @@
       remover.type = "button";
       remover.textContent = "×";
       remover.title = "Remover";
-      remover.setAttribute("aria-label", `Remover a planilha ${nome}`);
+      remover.setAttribute("aria-label", `Remover ${nome}`);
       remover.addEventListener("click", () => removerAnexo(nome));
       item.append(texto, remover);
       lista.append(item);
@@ -1467,19 +1467,20 @@
     if (!ACEITOS.test(arquivo.name)) {
       adicionarMensagem(
         "assistente",
-        `Não consigo ler ${arquivo.name}. Anexe uma planilha .xlsx, .xlsm ou .csv.`,
+        `Não consigo ler ${arquivo.name}. Anexe uma planilha .xlsx, .xlsm ou .csv, ou um PDF.`,
         true
       );
       return;
     }
 
-    adicionarMensagem("voce", `Anexei a planilha ${arquivo.name}.`);
+    const ehPdf = /\.pdf$/i.test(arquivo.name);
+    adicionarMensagem("voce", `Anexei ${ehPdf ? "o PDF" : "a planilha"} ${arquivo.name}.`);
     calar();
     ocupada = true;
     botaoEnviar.disabled = true;
     botaoClipe.disabled = true;
     clearTimeout(voltaParaPronto);
-    definirEstado("consultando", "Lendo a planilha…");
+    definirEstado("consultando", ehPdf ? "Lendo o PDF…" : "Lendo a planilha…");
     try {
       const resposta = await apiServidor.anexar(arquivo);
       mostrarAnexos(resposta.anexos);
@@ -1491,7 +1492,7 @@
       definirEstado("erro");
       adicionarMensagem(
         "assistente",
-        `Não consegui anexar a planilha. Detalhes: ${(erro && erro.message) || erro}`,
+        `Não consegui anexar o arquivo. Detalhes: ${(erro && erro.message) || erro}`,
         true
       );
       voltarParaPronto(1600);
@@ -1504,7 +1505,7 @@
   }
 
   async function removerAnexo(nome) {
-    if (!confirm(`Remover a planilha ${nome}? A MAX deixa de ler esse arquivo.`)) return;
+    if (!confirm(`Remover ${nome}? A MAX deixa de ler esse arquivo.`)) return;
     try {
       mostrarAnexos((await apiServidor.removerAnexo(nome)).anexos);
     } catch (erro) {
@@ -1820,7 +1821,7 @@
     try { $("nome-usuario").value = localStorage.getItem("max-usuario") || ""; } catch (erro) { /* sem armazenamento */ }
 
     botaoClipe.hidden = false;
-    entrada.placeholder = "Digite sua pergunta ou arraste uma planilha aqui";
+    entrada.placeholder = "Digite sua pergunta ou arraste uma planilha ou PDF aqui";
     botaoClipe.addEventListener("click", () => escolherArquivo.click());
     escolherArquivo.addEventListener("change", () => {
       const arquivo = escolherArquivo.files[0];

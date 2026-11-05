@@ -44,6 +44,7 @@ A mesma conversa funciona de quatro jeitos:
 - **Lê o ERP Bellocopo:** baixa sozinho o estoque atual e as quatro previsões (produtos, insumos, produtos de festa e insumos de festa) e responde coisas como "o que vai zerar nas próximas 3 semanas e em que dia". Também consulta **pedidos**: o que tem num pedido e se algum item pode faltar, e quais pedidos têm um produto, por status. Só lê; nunca altera nada no ERP.
 - **Abre links da internet:** mande o endereço na conversa e a MAX lê a página para resumir ou responder. Se o link for de uma planilha (Excel, CSV ou Google Planilhas pública), ele baixa e analisa como se fosse uma planilha anexada.
 - **Lê planilhas anexadas no chat** (`.xlsx`, `.xlsm` ou `.csv`, até 30 MB): clique no clipe ao lado da caixa de mensagem ou arraste o arquivo para a janela. A MAX responde com as abas e colunas que encontrou, e dá para pedir análises, somas, rankings e exportações como em qualquer outra aba. Cada pessoa só vê as próprias planilhas anexadas.
+- **Lê PDFs anexados e confere o estoque:** anexe um PDF (pedido, orçamento, lista de itens) do mesmo jeito e peça "esses itens têm em estoque?". A MAX lê o texto e as tabelas do PDF, monta a lista de itens e o Python acha cada um no estoque do ERP pelo código, pelo código de barras (EAN) ou pela descrição, dizendo o que tem estoque, o que está parcial (e quanto falta), o que está zerado e o que não existe no ERP. Itens achados só pela descrição vêm como "provável", para confirmar. PDF escaneado (só imagem) não tem texto e não é lido. Precisa do acesso ao ERP liberado (veja `ERP_USUARIOS`).
 - **Quadro "Estoque por aba"**, com a situação de cada aba em cores de andon (crítica, alta, média, na meta, sem demanda).
 - **Lembra de cada pessoa:** histórico da conversa e memória de longo prazo separados por usuário.
 
@@ -106,7 +107,8 @@ GEMINI_API_KEY=sua_chave_aqui
 
 # Opcional: troca os modelos sem mexer no código
 GEMINI_MODELO=gemini-3.5-flash-lite
-GEMINI_MODELO_RESERVA=gemini-3.5-flash
+GEMINI_MODELO_RESERVA=gemini-3.1-flash-lite,gemini-2.5-flash-lite
+GEMINI_MODELO_MEMORIA=gemini-3.1-flash-lite
 
 # Opcional: quantas perguntas o site responde ao mesmo tempo (padrão 32)
 MAX_SIMULTANEAS=32
@@ -119,7 +121,9 @@ ERP_USUARIOS=Kevin Pereira
 
 Depois de mudar o `.env`, feche e abra o servidor de novo.
 
-Quando o Google devolve um erro passageiro (503 de modelo sobrecarregado, 429 de limite por minuto, 500, 502 ou 504), a MAX faz até 3 tentativas no modelo principal, esperando 2 e depois 5 segundos entre elas. Se não der, faz mais 2 tentativas no **modelo reserva**. Só depois disso ele mostra uma mensagem explicando o problema. Para não usar o modelo reserva, deixe `GEMINI_MODELO_RESERVA=` vazio.
+Cada modelo tem a sua própria cota no Google, então os **modelos reserva** somam capacidade. Quando o Google devolve 429 (limite por minuto), a MAX passa na hora para o próximo modelo da lista e deixa aquele de lado por 60 segundos. Nos outros erros passageiros (503 de modelo sobrecarregado, 500, 502 ou 504), faz até 3 tentativas no modelo principal, esperando 2 e depois 5 segundos, e depois 2 tentativas em cada reserva. Só depois disso ela mostra uma mensagem explicando o problema. Para não usar reservas, deixe `GEMINI_MODELO_RESERVA=` vazio.
+
+A consolidação da memória usa o `GEMINI_MODELO_MEMORIA`, para não gastar a cota do modelo principal, e roda a cada 3 perguntas.
 
 O `.env` está no `.gitignore` e **nunca** deve ir para o GitHub.
 

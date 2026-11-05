@@ -27,7 +27,7 @@ from modulos.base_dados import (
     localizar_planilha,
     normalizar,
 )
-from modulos import erp, links, planilhas
+from modulos import conferencia, erp, links, pdfs, planilhas
 from modulos.plano_acao import calcular_plano, salvar_plano
 
 
@@ -751,7 +751,7 @@ def consultar_pedido_erp(numero: str) -> dict:
     return _do_erp(erp.consultar_pedido, numero)
 
 
-def consultar_pedidos_produto_erp(codigo: str) -> dict:
+def consultar_pedidos_produto_erp(codigo: str, status: str) -> dict:
     """Lista os pedidos de um produto no ERP Bellocopo (tela Consulta por Produto).
 
     Use para saber quais pedidos têm um produto, em que datas estão
@@ -760,13 +760,92 @@ def consultar_pedidos_produto_erp(codigo: str) -> dict:
 
     Args:
         codigo: Código do produto (ex.: "TBFCRC20-50F").
+        status: Só os pedidos com este status (ex.: "Programado",
+            "Aprovado", "Análise"). Use "" para todos. Quando o usuário
+            falar de um status, passe-o aqui em vez de filtrar a lista.
 
     Returns:
-        Os pedidos (Data Programada, Pedido, Status, Quantidade), a
-        quantidade total e os totais por status.
+        Os totais por status de todos os pedidos e a lista "pedidos",
+        uma linha por pedido ("data programada | pedido | status |
+        quantidade"), já filtrada pelo status pedido, com
+        pedidos_no_filtro e quantidade_no_filtro.
     """
-    _log(f"consultando no ERP os pedidos do produto {codigo!r}")
-    return _do_erp(erp.consultar_produto, codigo)
+    _log(f"consultando no ERP os pedidos do produto {codigo!r} (status {status!r})")
+    return _do_erp(erp.consultar_produto, codigo, status)
+
+
+# ============================================================
+# PDFS ANEXADOS E CONFERÊNCIA DE ESTOQUE
+# ============================================================
+
+def ler_pdf(arquivo: str, parte: int) -> dict:
+    """Lê o texto de um PDF que o usuário anexou (pedido, orçamento, lista de itens...).
+
+    Use quando o usuário falar de um PDF que mandou: para resumir, achar
+    informações ou montar a lista de itens antes de conferir_estoque. O
+    texto vem página por página, em partes.
+
+    Args:
+        arquivo: Nome do PDF anexado, completo ou em parte. Use "" se
+            houver um só.
+        parte: Qual parte do texto ler, começando em 1. Use 2, 3... só se
+            a resposta anterior disser que há mais partes.
+
+    Returns:
+        Nome do arquivo, número de páginas, a parte do texto e quantas
+        partes existem. Em caso de erro, a mensagem para o usuário.
+    """
+    pasta = planilhas.pasta_dos_anexos()
+    pdfs_anexados = [p for p in planilhas.arquivos_anexos(pasta) if p.suffix.lower() == ".pdf"] if pasta else []
+    if not pdfs_anexados:
+        return {"erro": "Não há nenhum PDF anexado. Peça para o usuário anexar o PDF pelo clipe."}
+    filtro = planilhas.normalizar(arquivo)
+    escolhidos = [p for p in pdfs_anexados if filtro in planilhas.normalizar(p.name)] if filtro else pdfs_anexados
+    if len(escolhidos) != 1:
+        return {
+            "erro": "Diga qual PDF ler." if escolhidos else f"Não achei o PDF '{arquivo}'.",
+            "pdfs_anexados": [p.name for p in pdfs_anexados],
+        }
+    _log(f"lendo o PDF {escolhidos[0].name!r}")
+    try:
+        return {"arquivo": escolhidos[0].name, **pdfs.texto_em_partes(escolhidos[0], parte)}
+    except Exception as erro:
+        return {"erro": f"Não consegui ler o PDF: {erro}"}
+
+
+def conferir_estoque(itens: str) -> dict:
+    """Confere no estoque atual do ERP se há estoque para uma lista de itens.
+
+    Use quando o usuário pedir para ver se os itens de um PDF, pedido,
+    planilha ou mensagem têm estoque. Antes, leia o documento (ler_pdf ou
+    consultar_aba) e mande TODOS os itens de uma vez. O Python acha cada
+    item no ERP pelo código, pelo código de barras ou pela descrição e
+    compara com o estoque.
+
+    Args:
+        itens: Um item por linha, no formato "código e descrição;
+            quantidade". Copie o código e a descrição exatamente como
+            estão no documento (o código completo, com tudo o que vier
+            depois de espaços ou traços); sem código, só a descrição.
+            Sem quantidade, mande só o código e a descrição. Ex.:
+            "TBFCRC20-50F; 120
+COPO PP 200ML BRANCO; 50".
+
+    Returns:
+        Para cada item: código e produto do ERP, como foi achado,
+        estoque no ERP, quantidade pedida, situação (tem estoque,
+        estoque parcial, sem estoque, não encontrado no ERP) e quanto
+        falta ou sobra; e a contagem por situação.
+    """
+    if not erp.liberado_agora():
+        return _sem_acesso()
+    _log("conferindo itens no estoque do ERP")
+    try:
+        return conferencia.conferir(itens, erp.carregar("estoque"))
+    except erp.ErroERP as erro:
+        return {"erro": str(erro)}
+    except Exception as erro:
+        return {"erro": f"Não consegui conferir o estoque: {erro}"}
 
 
 # ============================================================
@@ -810,4 +889,6 @@ FERRAMENTAS_PCP = [
     consultar_erp,
     consultar_pedido_erp,
     consultar_pedidos_produto_erp,
+    ler_pdf,
+    conferir_estoque,
 ]

@@ -476,8 +476,17 @@ def consultar_pedido(numero):
     return {"pedido": numero, "itens": [], "aviso": "O ERP não encontrou itens com esse número de pedido."}
 
 
-def consultar_produto(codigo):
-    """Pedidos de um produto (tela Consulta por Produto), com totais por status."""
+LIMITE_PEDIDOS = 100
+
+
+def consultar_produto(codigo, status=""):
+    """Pedidos de um produto (tela Consulta por Produto), com totais por status.
+
+    status: só os pedidos com esse status ("Programado", "analise"...; sem
+    diferença de acento ou maiúscula). Vazio traz todos. O filtro é feito
+    aqui, e não pelo modelo, para que a lista devolvida já seja a resposta:
+    filtrando de cabeça uma lista longa, o modelo chegou a inventar pedidos.
+    """
     codigo = str(codigo or "").strip().upper()
     if not codigo:
         raise ErroERP("Informe o código do produto.")
@@ -490,18 +499,39 @@ def consultar_produto(codigo):
 
     por_status = {}
     for pedido in pedidos:
-        status = por_status.setdefault(pedido.get("Status") or "(sem status)", {"pedidos": 0, "quantidade": 0})
-        status["pedidos"] += 1
+        status_do_pedido = por_status.setdefault(pedido.get("Status") or "(sem status)", {"pedidos": 0, "quantidade": 0})
+        status_do_pedido["pedidos"] += 1
         if isinstance(pedido.get("Quantidade"), (int, float)):
-            status["quantidade"] += pedido["Quantidade"]
+            status_do_pedido["quantidade"] += pedido["Quantidade"]
     resultado = {
         "produto": codigo,
         "quantidade_de_pedidos": len(pedidos),
         "quantidade_total": sum(s["quantidade"] for s in por_status.values()),
         "por_status": por_status,
-        "pedidos": pedidos[:100],
-        "consultado": f"{datetime.now():%d/%m %H:%M}",
     }
-    if len(pedidos) > 100:
-        resultado["aviso"] = "Mostrando só os 100 primeiros pedidos; os totais contam todos."
+
+    filtro = planilhas.normalizar(status or "")
+    if filtro:
+        escolhidos = [p for p in pedidos if filtro in planilhas.normalizar(p.get("Status") or "")]
+        resultado["filtro_status"] = status
+        resultado["pedidos_no_filtro"] = len(escolhidos)
+        resultado["quantidade_no_filtro"] = sum(
+            p["Quantidade"] for p in escolhidos if isinstance(p.get("Quantidade"), (int, float))
+        )
+        if not escolhidos:
+            resultado["aviso"] = (f"Nenhum pedido com status '{status}'. Status que existem: "
+                                  f"{', '.join(por_status)}.")
+        pedidos = escolhidos
+
+    # Uma linha de texto por pedido, já na ordem do ERP (por data programada):
+    # é o que a MAX copia para a resposta, sem montar nada.
+    resultado["pedidos"] = [
+        f"{p.get('Data Programada', '')} | pedido {p.get('Pedido', '')} | "
+        f"{p.get('Status', '')} | quantidade {p.get('Quantidade', '')}"
+        for p in pedidos[:LIMITE_PEDIDOS]
+    ]
+    resultado["consultado"] = f"{datetime.now():%d/%m %H:%M}"
+    if len(pedidos) > LIMITE_PEDIDOS:
+        resultado["aviso"] = (f"Mostrando só os {LIMITE_PEDIDOS} primeiros de {len(pedidos)} pedidos; "
+                              "os totais contam todos.")
     return resultado

@@ -20,6 +20,8 @@ Planilhas anexadas pelo chat ficam em usuarios/<nome>/anexos e só
 aparecem para quem anexou: a MAX chama usar_anexos(pasta) antes de
 responder, e as abas desses arquivos entram na lista só naquela thread.
 O nome delas começa pelo nome do arquivo ("Estoque - Planilha1").
+PDFs anexados também viram tabelas ("Pedido - Tabela 1", "Pedido -
+Texto"), lidas pelo módulo pdfs.
 """
 
 import io
@@ -35,6 +37,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
+from modulos import pdfs
 from modulos.base_dados import checar_pasta_dados
 
 
@@ -47,7 +50,7 @@ LIMITE_LINHAS = 100
 LIMITE_COLUNAS = 30
 LIMITE_GRUPOS = 60
 LIMITE_TEXTO = 120
-EXTENSOES_ANEXO = (".xlsx", ".xlsm", ".csv")
+EXTENSOES_ANEXO = (".xlsx", ".xlsm", ".csv", ".pdf")
 
 
 # ============================================================
@@ -284,6 +287,11 @@ def _ler_arquivo(caminho, anexo=False, nome=None):
     nome = nome or caminho.name
     if caminho.suffix.lower() == ".csv":
         return [Tabela(Path(nome).stem, nome, False, _ler_csv(caminho), anexo)]
+    if caminho.suffix.lower() == ".pdf":
+        return [
+            Tabela(f"{Path(nome).stem} - {parte}", nome, False, df, anexo)
+            for parte, df in pdfs.tabelas(caminho, _montar_df)
+        ]
 
     wb = load_workbook(caminho, read_only=True, data_only=True)
     try:
@@ -380,6 +388,7 @@ def esquecer(caminho):
     """Tira um arquivo do cache (ex.: anexo removido)."""
     with _trava:
         _cache.pop(Path(caminho), None)
+    pdfs.esquecer(caminho)
 
 
 def tabelas():

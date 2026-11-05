@@ -39,7 +39,7 @@ PASTA_USUARIOS = PASTA / "usuarios"
 PASTA_RELATORIOS = PASTA / "relatorios"
 
 LIMITE_MENSAGEM = 4000  # caracteres por pergunta
-LIMITE_ANEXO_MB = 30    # tamanho máximo de uma planilha anexada
+LIMITE_ANEXO_MB = 30    # tamanho máximo de uma planilha ou PDF anexado
 
 # Quantas perguntas a MAX responde ao mesmo tempo. Cada uma fica presa
 # esperando o Gemini (alguns segundos), por isso o limite é separado das
@@ -214,7 +214,7 @@ def _erro(erro):
 
 @app.errorhandler(413)
 def _grande_demais(erro):
-    return jsonify({"erro": f"A planilha passou de {LIMITE_ANEXO_MB} MB."}), 413
+    return jsonify({"erro": f"O arquivo passou de {LIMITE_ANEXO_MB} MB."}), 413
 
 
 # ============================================================
@@ -388,8 +388,28 @@ def _lista_de_anexos(ident):
     return [p.name for p in planilhas.arquivos_anexos(_pasta_anexos(ident))]
 
 
+def _resumo_do_pdf(nome_arquivo, tabelas):
+    """Texto que a MAX mostra ao receber um PDF (sem gastar o Gemini)."""
+    texto = next((t for t in tabelas if t.nome.endswith(" - Texto")), None)
+    paginas = int(texto.df["Página"].max()) if texto is not None and len(texto.df) else 0
+    com_tabela = [t for t in tabelas if t is not texto]
+    tabelas_txt = (
+        "" if not com_tabela else
+        " e 1 tabela" if len(com_tabela) == 1 else f" e {len(com_tabela)} tabelas"
+    )
+    return (
+        f"Recebi o PDF {nome_arquivo}: "
+        + ("1 página" if paginas == 1 else f"{paginas} páginas")
+        + f" com texto{tabelas_txt}.\n"
+        "O que você quer saber dele? Posso resumir, achar uma informação ou "
+        "conferir se os itens têm estoque no ERP."
+    )
+
+
 def _resumo_do_anexo(nome_arquivo, tabelas):
     """Texto que a MAX mostra ao receber a planilha (sem gastar o Gemini)."""
+    if nome_arquivo.lower().endswith(".pdf"):
+        return _resumo_do_pdf(nome_arquivo, tabelas)
     prefixo = os.path.splitext(nome_arquivo)[0] + " - "   # "Estoque - Planilha1" -> "Planilha1"
     partes = []
     for t in tabelas[:8]:
@@ -421,7 +441,7 @@ def anexar():
     nome, ident = _usuario()
     arquivo = request.files.get("arquivo")
     if arquivo is None or not arquivo.filename:
-        abort(400, description="Escolha uma planilha para anexar.")
+        abort(400, description="Escolha uma planilha ou PDF para anexar.")
     nome_arquivo = planilhas.nome_do_anexo(arquivo.filename)
     extensao = os.path.splitext(nome_arquivo)[1]
     if extensao == ".xls":
@@ -430,7 +450,7 @@ def anexar():
             "salve como .xlsx (Arquivo > Salvar como > Pasta de Trabalho do Excel)."
         ))
     if extensao not in planilhas.EXTENSOES_ANEXO or len(nome_arquivo) <= len(extensao):
-        abort(400, description="Anexe uma planilha .xlsx, .xlsm ou .csv.")
+        abort(400, description="Anexe uma planilha .xlsx, .xlsm ou .csv, ou um PDF.")
 
     pasta = _pasta_anexos(ident)
     pasta.mkdir(parents=True, exist_ok=True)
@@ -441,11 +461,12 @@ def anexar():
         tabelas = planilhas.receber_anexo(temporario, destino)
     except Exception as erro:
         print(f"[MAX] Anexo de {nome} recusado ({nome_arquivo}): {erro!r}", flush=True)
-        abort(400, description=f"Não consegui ler a planilha {nome_arquivo}: {erro}")
+        abort(400, description=f"Não consegui ler {nome_arquivo}: {erro}")
 
     print(f"[MAX] {nome} anexou {nome_arquivo}.", flush=True)
     texto = _resumo_do_anexo(nome_arquivo, tabelas)
-    _assistente(nome, ident).registrar_anexo(f"Anexei a planilha {nome_arquivo}.", texto)
+    aviso = "o PDF" if extensao == ".pdf" else "a planilha"
+    _assistente(nome, ident).registrar_anexo(f"Anexei {aviso} {nome_arquivo}.", texto)
     return jsonify({"texto": texto, "anexos": _lista_de_anexos(ident)})
 
 
@@ -458,7 +479,7 @@ def remover_anexo():
         None,
     )
     if caminho is None:
-        abort(404, description="Essa planilha não está mais anexada.")
+        abort(404, description="Esse arquivo não está mais anexado.")
     planilhas.esquecer(caminho)
     caminho.unlink()
     return jsonify({"anexos": _lista_de_anexos(ident)})

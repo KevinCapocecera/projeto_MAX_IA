@@ -4,6 +4,7 @@
 # Planilhas (assistente de PCP)
 pandas==3.0.6
 openpyxl==3.1.5
+pdfplumber==0.11.10        # PDFs anexados no chat
 python-dateutil==2.9.0.post0  # a mesma da sua .venv (sem isso viria a 3.0.0)
 
 # Chat com o Gemini
