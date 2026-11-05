@@ -31,6 +31,9 @@ PERGUNTAS = [
     "Como está a Fiesta?",
     "Qual a carteira do segmento PET na análise da Fiesta?",
     'Quais itens estão com status "COMPRAR" na análise de itens de compra?',
+    # Item que só existe fora das abas de DOH (ANÁLISE ITENS DE COMPRA):
+    # a MAX não pode responder que ele não está na planilha.
+    "Qual o estoque do item CAKBOABRA-18?",
 ]
 
 

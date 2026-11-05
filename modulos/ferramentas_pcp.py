@@ -432,6 +432,24 @@ def buscar_produto_pcp(termo: str) -> dict:
         )
     if abas_sem_analise:
         resultado["abas_nao_pesquisadas"] = abas_sem_analise
+    if not encontrados:
+        # O item pode estar fora das abas de DOH (ex.: ANÁLISE ITENS DE
+        # COMPRA, SOLICITAÇÕES DE COMPRA). Sem isso o modelo lia o zero
+        # como "o código não existe na planilha".
+        outras = _protegido(planilhas.buscar, termo)
+        resultado["outras_abas"] = outras
+        # "caixas" só vale para as abas de DOH; nas outras a unidade
+        # é a da própria aba.
+        resultado.pop("unidade", None)
+        if isinstance(outras, dict) and outras.get("abas"):
+            resultado["aviso"] = (
+                "O produto não está nas abas de DOH, mas EXISTE nas "
+                "abas listadas em outras_abas. Responda com esses dados."
+            )
+        else:
+            resultado["aviso"] = (
+                "O termo não aparece em nenhuma aba da planilha."
+            )
     return resultado
 
 
