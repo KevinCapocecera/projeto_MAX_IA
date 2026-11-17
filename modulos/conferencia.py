@@ -1,4 +1,4 @@
-"""Confere uma lista de itens (de um PDF, de uma mensagem...) no estoque do ERP.
+"""Confere uma lista de itens (de um PDF, de uma mensagem...) no estoque atual do portal.
 
 A MAX lê o documento, monta a lista "código ou descrição; quantidade" e
 chama conferir(). Quem acha cada item e faz as contas é o Python:
@@ -191,7 +191,7 @@ def conferir(itens_texto, tabela_estoque):
     for termo, quantidade in itens:
         indice, como, opcoes = estoque.achar(termo)
         if indice is None:
-            item = {"item_do_documento": termo, "situacao": "não encontrado no ERP"}
+            item = {"item_do_documento": termo, "situacao": "não encontrado no estoque"}
             if quantidade is not None:
                 item["quantidade_pedida"] = _bonito(quantidade)
             if opcoes:
@@ -210,12 +210,13 @@ def conferir(itens_texto, tabela_estoque):
             "codigo": linha["Código"],
             "produto": linha.get("Nome", ""),
             "achado_por": como,
-            "estoque_erp": _bonito(_numero(linha.get("Quantidade"))),
+            "estoque_atual": _bonito(_numero(linha.get("Quantidade"))),
             "linhas_no_documento": 1,
             "_pedida": quantidade,
         }
-        if not planilhas._vazio(linha.get("Segmento")):
-            item["segmento"] = linha["Segmento"]
+        for coluna in ("Tipo", "Segmento", "Unidade"):
+            if not planilhas._vazio(linha.get(coluna)):
+                item[coluna.lower()] = linha[coluna]
         if opcoes:
             item["outras_opcoes"] = [_produto(df, i) for i in opcoes]
         achados[indice] = item
@@ -225,7 +226,7 @@ def conferir(itens_texto, tabela_estoque):
     for item in resultado:
         if "codigo" in item:
             pedida = item.pop("_pedida")
-            disponivel = _numero(item["estoque_erp"])
+            disponivel = _numero(item["estoque_atual"])
             if item["linhas_no_documento"] == 1:
                 del item["linhas_no_documento"]
             if pedida is None:
@@ -249,8 +250,9 @@ def conferir(itens_texto, tabela_estoque):
         "por_situacao": contagem,
         "itens": resultado,
         "atencao": (
-            "O ERP não diz a unidade da Quantidade. Se o documento estiver em "
-            "outra unidade (unidades x caixas), avise o usuário antes de "
+            "O estoque está na unidade do campo 'unidade' de cada item (CX = "
+            "caixas, PT = pacotes...). Se o documento estiver em outra unidade "
+            "(unidades x caixas), avise o usuário antes de "
             "concluir. Itens 'descrição (provável)' precisam de confirmação."
         ),
     }

@@ -367,7 +367,10 @@ def listar_produtos_pcp(aba: str, filtro: str, limite: int) -> dict:
 
 
 def buscar_produto_pcp(termo: str) -> dict:
-    """Procura produtos em todas as abas de análise do PCP.
+    """Procura produtos em todas as abas de análise do PCP (DOH, prioridade, necessidade).
+
+    NÃO use para estoque atual, saldo, carteira ou previsão de um item:
+    isso vem só do BelloPortal (estoque_item_portal).
 
     A busca olha o código, o segmento, a REF e a cor. Todas as palavras
     do termo precisam aparecer no produto. Produtos PET também são
@@ -578,6 +581,8 @@ def buscar_na_planilha(termo: str) -> dict:
 
     Use quando o usuário citar um item e não estiver claro em qual aba
     ele está, ou para juntar tudo o que a planilha tem sobre um código.
+    NÃO use para estoque atual, saldo, carteira ou previsão de um item:
+    isso vem só do BelloPortal (estoque_item_portal).
 
     Args:
         termo: Texto a procurar (parte do código ou da descrição).
@@ -682,7 +687,7 @@ def ler_link(url: str, parte: int) -> dict:
 # ============================================================
 
 def _sem_acesso():
-    return {"erro": f"Não dá para consultar o ERP: {erp.motivo_agora()}. Quem cuida da MAX resolve no arquivo .env."}
+    return {"erro": f"Não dá para consultar o portal nem o ERP: {erp.motivo_agora()}. Quem cuida da MAX resolve no arquivo .env."}
 
 
 def _do_erp(funcao, *args):
@@ -709,26 +714,32 @@ def _nome_do_relatorio(texto):
 
 
 def consultar_erp(relatorio: str) -> dict:
-    """Baixa do ERP Bellocopo o estoque atual ou uma previsão de estoque, para consultar.
+    """Lê do BelloPortal o estoque atual ou uma previsão de estoque, para consultar.
 
     Use para previsão de estoque, ruptura (o que vai faltar ou zerar e
-    quando), estoque atual do ERP, carteira, pedidos e separado. Depois
-    leia a aba devolvida com consultar_aba e resumir_aba. O download leva
-    alguns segundos e vale por 10 minutos.
+    quando), estoque atual, carteira, pedidos em carteira e separado.
+    Depois leia a aba devolvida com consultar_aba e resumir_aba. A
+    leitura leva alguns segundos e vale por 10 minutos.
+
+    Um item do Tipo Descartáveis não aparece no Tipo Festa e vice-versa:
+    procure primeiro na previsão de Descartáveis e, se o item não estiver
+    lá, na de Festa.
 
     Args:
-        relatorio: "estoque" (estoque atual de produtos, com segmento e
-            marca), "previsao_produtos", "previsao_insumos",
-            "previsao_produtos_festa" ou "previsao_insumos_festa".
+        relatorio: "estoque" (estoque atual de produtos, dos dois Tipos,
+            com segmento, categoria e unidade), "previsao_produtos" ou
+            "previsao_insumos" (Tipo Descartáveis),
+            "previsao_produtos_festa" ou "previsao_insumos_festa" (Tipo
+            Festa).
 
     Returns:
-        O nome da aba ("ERP - ..."), quantas linhas, as colunas e a hora
-        do download. Em caso de erro, a mensagem para o usuário.
+        O nome da aba ("Portal - ..."), quantas linhas, as colunas e a
+        hora da leitura. Em caso de erro, a mensagem para o usuário.
     """
     if not erp.liberado_agora():
         return _sem_acesso()
     chave = _nome_do_relatorio(relatorio)
-    _log(f"baixando do ERP: {chave}")
+    _log(f"lendo do portal: {chave}")
     try:
         tabela = erp.carregar(chave)
     except erp.ErroERP as erro:
@@ -746,8 +757,123 @@ def consultar_erp(relatorio: str) -> dict:
         "como_usar": f"Use consultar_aba e resumir_aba com aba=\"{tabela.nome}\".",
     }
     if dias:
-        resultado["colunas_de_dia"] = f"{len(dias)} colunas de estoque previsto, de {dias[0]} a {dias[-1]}"
+        resultado["colunas_de_dia"] = (
+            f"{len(dias)} colunas de saldo previsto de fim de dia, de {dias[0]} a {dias[-1]} "
+            f"(a primeira, de ontem, é o Estoque atual)"
+        )
+    outro = {"previsao_produtos": "previsao_produtos_festa", "previsao_insumos": "previsao_insumos_festa"}
+    if chave in outro:
+        resultado["se_nao_achar"] = (
+            f"Este é o Tipo Descartáveis. Se o item não estiver aqui, consulte "
+            f"consultar_erp(\"{outro[chave]}\") (Tipo Festa) antes de dizer que ele não existe."
+        )
     return resultado
+
+
+# Ordem da busca de um item no portal: Descartáveis antes de Festa, produtos antes de insumos.
+_ORDEM_PORTAL = ("previsao_produtos", "previsao_produtos_festa", "previsao_insumos", "previsao_insumos_festa")
+_COLUNAS_ITEM = (
+    "Código", "Produto", "Tipo", "Segmento", "Categoria", "Unidade", "Estoque atual", "Previsto hoje",
+    "Estoque em 7 dias", "Estoque em 15 dias", "Estoque em 30 dias", "Menor estoque previsto",
+    "Zera em", "Dias até zerar", "Média 4m", "Carteira", "Pedidos", "Separado",
+)
+
+
+def _so_letras_e_numeros(texto):
+    return re.sub(r"[^0-9A-Z]", "", planilhas.normalizar(str(texto)).upper())
+
+
+def _linhas_do_item(df, termo):
+    """(como achou, linhas) do item no DataFrame: código exato, código começando, ou descrição."""
+    codigos = df["Código"].map(_so_letras_e_numeros)
+    alvo = _so_letras_e_numeros(termo)
+    if alvo:
+        exato = df[codigos == alvo]
+        if len(exato):
+            return "código", exato
+    palavras = [_so_letras_e_numeros(p) for p in str(termo).split()]
+    palavras = [p for p in palavras if p]
+    if len(palavras) == 1 and len(alvo) >= 4:
+        comeca = df[codigos.str.startswith(alvo)]
+        if len(comeca):
+            return "começo do código", comeca
+    if palavras:
+        nomes = df["Produto"].map(_so_letras_e_numeros)
+        achados = df[nomes.map(lambda n: all(p in n for p in palavras))]
+        if len(achados):
+            return "descrição", achados
+    return None, df.iloc[0:0]
+
+
+def estoque_item_portal(item: str) -> dict:
+    """Estoque atual e previsão de UM item, lidos direto do BelloPortal.
+
+    Use SEMPRE que perguntarem estoque, saldo, quanto tem, carteira,
+    média, previsão ou quando zera de um produto ou insumo. É a única
+    fonte de estoque: não responda estoque pelas planilhas. A busca já
+    olha o Tipo Descartáveis e, se não achar, o Tipo Festa (produtos e
+    depois insumos).
+
+    Args:
+        item: Código do item (ex.: "CCB-50", "PBLISROC") ou palavras da
+            descrição (ex.: "copo 200ml rosa bello festas").
+
+    Returns:
+        O(s) item(ns) achado(s) com Tipo, Unidade, Estoque atual (fim do
+        dia de ontem), Previsto hoje, estoque em 7/15/30 dias, Zera em,
+        Média 4m, Carteira, Pedidos e Separado; onde procurou e a hora da
+        leitura. Se não achar em nenhum Tipo, diz isso.
+    """
+    if not erp.liberado_agora():
+        return _sem_acesso()
+    _log(f"procurando no portal o item {item!r}")
+    procurou = []
+    try:
+        for relatorio in _ORDEM_PORTAL:
+            tabela = erp.carregar(relatorio)
+            procurou.append(tabela.nome.replace("Portal - ", ""))
+            como, linhas = _linhas_do_item(tabela.df, item)
+            if not len(linhas):
+                continue
+            colunas = [c for c in _COLUNAS_ITEM if c in linhas.columns]
+            itens = []
+            for _, linha in linhas.head(10).iterrows():
+                registro = {}
+                for c in colunas:
+                    valor = linha[c]
+                    if planilhas._vazio(valor):
+                        continue
+                    if isinstance(valor, datetime):
+                        valor = f"{valor:%d/%m/%Y}"
+                    elif isinstance(valor, float) and valor.is_integer():
+                        valor = int(valor)
+                    registro[c] = valor
+                if "Unidade" not in registro:
+                    registro["Unidade"] = (
+                        "não informada pelo portal: diga só o número, sem 'caixas' nem 'unidades'"
+                    )
+                itens.append(registro)
+            resultado = {
+                "fonte": f"BelloPortal - {tabela.nome.replace('Portal - ', '')} ({tabela.arquivo})",
+                "achado_por": como,
+                "itens_encontrados": len(linhas),
+                "itens": itens,
+                "procurou_em": procurou,
+            }
+            if len(linhas) > len(itens):
+                resultado["aviso"] = f"Mostrando {len(itens)} de {len(linhas)}; peça um termo mais específico."
+            if como == "descrição" and len(linhas) > 1:
+                resultado["atencao"] = "Mais de um item combina com a descrição: confirme com o usuário qual é."
+            return resultado
+    except erp.ErroERP as erro:
+        return {"erro": str(erro)}
+    except Exception as erro:
+        return {"erro": f"Não consegui ler o portal: {erro}"}
+    return {
+        "erro": f"Não achei '{item}' no BelloPortal.",
+        "procurou_em": procurou,
+        "atencao": "O item não está em nenhum Tipo do portal (Descartáveis nem Festa). Não use as planilhas para dar o estoque.",
+    }
 
 
 def consultar_pedido_erp(numero: str) -> dict:
@@ -832,7 +958,7 @@ def ler_pdf(arquivo: str, parte: int) -> dict:
 
 
 def conferir_estoque(itens: str) -> dict:
-    """Confere no estoque atual do ERP se há estoque para uma lista de itens.
+    """Confere no estoque atual (BelloPortal, Descartáveis e Festa) se há estoque para uma lista de itens.
 
     Use quando o usuário pedir para ver se os itens de um PDF, pedido,
     planilha ou mensagem têm estoque. Antes, leia o documento (ler_pdf ou
@@ -852,12 +978,12 @@ COPO PP 200ML BRANCO; 50".
     Returns:
         Para cada item: código e produto do ERP, como foi achado,
         estoque no ERP, quantidade pedida, situação (tem estoque,
-        estoque parcial, sem estoque, não encontrado no ERP) e quanto
+        estoque parcial, sem estoque, não encontrado no estoque) e quanto
         falta ou sobra; e a contagem por situação.
     """
     if not erp.liberado_agora():
         return _sem_acesso()
-    _log("conferindo itens no estoque do ERP")
+    _log("conferindo itens no estoque do portal")
     try:
         return conferencia.conferir(itens, erp.carregar("estoque"))
     except erp.ErroERP as erro:
@@ -904,6 +1030,7 @@ FERRAMENTAS_PCP = [
     exportar_consulta_excel,
     exportar_resumo_excel,
     ler_link,
+    estoque_item_portal,
     consultar_erp,
     consultar_pedido_erp,
     consultar_pedidos_produto_erp,

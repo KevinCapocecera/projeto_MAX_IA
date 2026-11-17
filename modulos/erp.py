@@ -1,16 +1,21 @@
-"""Leitura do ERP Bellocopo (sistema-erp.herokuapp.com): estoque, previsões e pedidos.
+"""Estoque e previsões (pelo BelloPortal) e pedidos (pelo ERP Bellocopo).
 
-A MAX entra no ERP com o login do .env e:
-- baixa os mesmos arquivos Excel dos botões de download do menu
-  Inventário (estoque e as quatro previsões);
-- faz as buscas das telas "Consulta por Pedido" e "Consulta por
-  Produto" do menu Pedidos e lê a tabela do resultado.
-Só LÊ: as únicas chamadas são o login e as da lista CHAMADAS_PERMITIDAS.
-Nunca usa "Atualizar previsão", "Atualizar Estoques" nem qualquer tela
-que grave alguma coisa no ERP.
+Estoque e as quatro previsões vêm do portal (modulos/portal.py), das
+telas Previsão de Produtos e Previsão de Insumos, nos Tipos Descartáveis
+e Festa. O estoque atual é o saldo de fim do dia de ONTEM na Previsão de
+Produtos, juntando os dois Tipos (um item está em um Tipo só).
+
+Os pedidos ainda vêm do ERP (sistema-erp.herokuapp.com), enquanto o
+portal não tem essas telas: a MAX entra no ERP com o login do .env e faz
+as buscas das telas "Consulta por Pedido" e "Consulta por Produto" do
+menu Pedidos, lendo a tabela do resultado.
+Só LÊ: no ERP, as únicas chamadas são o login e as da lista
+CHAMADAS_PERMITIDAS. Nunca grava nada no ERP nem no portal.
 
 Configuração no .env:
-    ERP_EMAIL=...          login do ERP
+    PORTAL_USUARIO=...     usuário de serviço do portal (estoque e previsões)
+    PORTAL_SENHA=...       senha dele
+    ERP_EMAIL=...          login do ERP (pedidos)
     ERP_SENHA=...          senha do ERP
     ERP_USUARIOS=Kevin Pereira, Outra Pessoa
                            quem pode consultar o ERP pela MAX (os nomes
@@ -25,47 +30,39 @@ Configuração no .env:
                            própria senha).
     ERP_URL=...            (opcional) outro endereço do ERP
 
-Cada relatório baixado vira uma tabela "ERP - <nome>", lida pelas mesmas
-ferramentas das planilhas (consultar_aba, resumir_aba...). Os arquivos
-ficam na pasta erp/ e são baixados de novo depois de VALIDADE_MINUTOS.
+Cada relatório vira uma tabela "Portal - <nome>", lida pelas mesmas
+ferramentas das planilhas (consultar_aba, resumir_aba...), e é lido de
+novo depois de portal.VALIDADE_MINUTOS.
 
 Nas previsões, a MAX acrescenta colunas calculadas a partir do estoque
-previsto de cada dia: Estoque hoje, em 7, 15 e 30 dias, Menor estoque
-previsto, Zera em e Dias até zerar. Nos produtos, traz também Segmento e
-Marca do relatório de estoque.
+previsto de cada dia: Estoque atual (fim de ontem), Previsto hoje, em 7,
+15 e 30 dias, Menor estoque previsto, Zera em e Dias até zerar.
 """
 
 import os
 import re
 import threading
 import time
-from datetime import date, datetime
+from datetime import datetime
 from html.parser import HTMLParser
-from pathlib import Path
 
 import httpx
 import pandas as pd
 
-from modulos import contas, planilhas
+from modulos import contas, planilhas, portal
 
 
-PASTA = Path(__file__).resolve().parent.parent / "erp"
 URL_PADRAO = "https://sistema-erp.herokuapp.com"
-VALIDADE_MINUTOS = 10
-DIAS_PARA_PREVER = 30   # o máximo que o ERP aceita
 TEMPO_LIMITE = 90       # segundos; o Heroku demora quando o ERP está "dormindo"
 
-TIPO_EXCEL = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-_PREVISAO = f"?diasAnteriores=1&diasParaPrever={DIAS_PARA_PREVER}"
+# relatorio -> (título, tela do portal, festa). O estoque junta a
+# Previsão de Produtos dos dois Tipos e fica só com a coluna de ontem.
 RELATORIOS = {
-    "estoque": ("Estoque de Produtos", "/inventario/download"),
-    "previsao_produtos": ("Previsão de Produtos", "/inventario/previsaoProdutos/download" + _PREVISAO),
-    "previsao_insumos": ("Previsão de Insumos", "/inventario/previsaoInsumos/download" + _PREVISAO),
-    "previsao_produtos_festa": ("Previsão de Produtos de Festa",
-                                "/inventario/previsaoProdutosFesta/download" + _PREVISAO),
-    "previsao_insumos_festa": ("Previsão de Insumos de Festa",
-                               "/inventario/previsaoInsumosFesta/download" + _PREVISAO),
+    "estoque": ("Estoque de Produtos", "produtos", None),
+    "previsao_produtos": ("Previsão de Produtos (Descartáveis)", "produtos", False),
+    "previsao_insumos": ("Previsão de Insumos (Descartáveis)", "insumos", False),
+    "previsao_produtos_festa": ("Previsão de Produtos (Festa)", "produtos", True),
+    "previsao_insumos_festa": ("Previsão de Insumos (Festa)", "insumos", True),
 }
 
 CONSULTA_PEDIDO = "/pedido/consultaPorPedido"     # campo numPedido
@@ -73,22 +70,28 @@ CONSULTA_PRODUTO = "/pedido/consultaPorProduto"   # campo codigo
 
 # Tudo o que a MAX pode pedir ao ERP, além do login. As duas buscas usam
 # POST porque o formulário do ERP é assim, mas só consultam.
-CHAMADAS_PERMITIDAS = {("GET", caminho.split("?")[0]) for _, caminho in RELATORIOS.values()} | {
+CHAMADAS_PERMITIDAS = {
     ("POST", CONSULTA_PEDIDO),
     ("POST", CONSULTA_PRODUTO),
 }
 
 
 class ErroERP(RuntimeError):
-    """Não deu para ler o ERP; a mensagem já está pronta para o usuário."""
+    """Não deu para ler o ERP ou o portal; a mensagem já está pronta para o usuário."""
 
 
 # ============================================================
 # QUEM PODE CONSULTAR
 # ============================================================
 
-def configurado():
+def erp_configurado():
+    """Login do ERP no .env (só para as consultas de pedidos)."""
     return bool(os.getenv("ERP_EMAIL") and os.getenv("ERP_SENHA"))
+
+
+def configurado():
+    """Há pelo menos uma fonte ligada: o portal (estoque e previsões) ou o ERP (pedidos)."""
+    return portal.configurado() or erp_configurado()
 
 
 def liberado_para(nome_usuario):
@@ -118,7 +121,8 @@ def motivo_sem_acesso(nome_usuario, permitido_aqui=True):
     está só no PC do servidor (ERP_SO_NESTE_PC).
     """
     if not configurado():
-        return "o ERP não está configurado no servidor: faltam ERP_EMAIL e ERP_SENHA no arquivo .env"
+        return ("o portal e o ERP não estão configurados no servidor: faltam PORTAL_USUARIO e "
+                "PORTAL_SENHA (ou ERP_EMAIL e ERP_SENHA) no arquivo .env")
     if not liberado_para(nome_usuario):
         return f"o nome {nome_usuario} não está na lista ERP_USUARIOS do arquivo .env"
     if not permitido_aqui:
@@ -146,7 +150,7 @@ def motivo_agora():
 
 
 # ============================================================
-# DOWNLOAD
+# CONEXÃO COM O ERP (só pedidos)
 # ============================================================
 
 _cliente = None
@@ -171,8 +175,6 @@ def _entrar(cliente):
 
 def _pediu_login(resposta):
     """O ERP devolveu a tela de login (sessão expirada ou senha errada)."""
-    if resposta.headers.get("content-type", "").startswith(TIPO_EXCEL):
-        return False
     return resposta.url.path.rstrip("/") == "/login" or 'action="/login"' in resposta.text
 
 
@@ -181,7 +183,7 @@ def _requisitar(metodo, caminho, dados=None):
     global _cliente
     if (metodo, caminho.split("?")[0]) not in CHAMADAS_PERMITIDAS:
         raise ErroERP(f"A MAX não tem permissão para {metodo} {caminho} no ERP.")
-    if not configurado():
+    if not erp_configurado():
         raise ErroERP("O ERP não está configurado: faltam ERP_EMAIL e ERP_SENHA no arquivo .env.")
     with _trava_rede:
         try:
@@ -209,38 +211,9 @@ def _requisitar(metodo, caminho, dados=None):
     )
 
 
-def _baixar(caminho):
-    """Bytes do Excel de um download do ERP."""
-    resposta = _requisitar("GET", caminho)
-    if resposta.status_code != 200 or not resposta.headers.get("content-type", "").startswith(TIPO_EXCEL):
-        raise ErroERP(f"O ERP não devolveu a planilha (resposta {resposta.status_code}).")
-    return resposta.content
-
-
 # ============================================================
 # COLUNAS CALCULADAS
 # ============================================================
-
-# Colunas de número no ERP (além das de dia). Ele usa ponto decimal ("92.25"),
-# e as planilhas da empresa usam o padrão brasileiro, em que "1.250" é mil
-# duzentos e cinquenta; por isso o ERP é convertido já na leitura.
-COLUNAS_NUMERO = {"Média 4m", "Carteira", "Pedidos", "Separado", "Quantidade"}
-
-
-def _numero_do_erp(valor):
-    if isinstance(valor, str) and re.fullmatch(r"-?\d+(\.\d+)?", valor.strip()):
-        numero = float(valor)
-        return int(numero) if numero.is_integer() else numero
-    return valor
-
-
-def _converter_numeros(df):
-    df = df.copy()
-    for coluna in df.columns:
-        if coluna in COLUNAS_NUMERO or re.fullmatch(r"\d{2}/\d{2}/\d{4}", str(coluna)):
-            df[coluna] = pd.Series([_numero_do_erp(v) for v in df[coluna]], index=df.index, dtype=object)
-    return df
-
 
 def _colunas_de_dia(df):
     """[(data, coluna)] das colunas "dd/mm/aaaa", em ordem."""
@@ -255,10 +228,12 @@ def _colunas_de_dia(df):
 
 def _com_colunas_calculadas(df, hoje):
     """Acrescenta, antes das colunas de dia, o resumo do estoque previsto."""
-    dias = [(d, c) for d, c in _colunas_de_dia(df) if d >= hoje]
+    todos = _colunas_de_dia(df)
+    dias = [(d, c) for d, c in todos if d >= hoje]
     if not dias:
         return df
     valores = pd.DataFrame({c: planilhas._numeros(df[c]) for _, c in dias}, index=df.index)
+    de_ontem = [c for d, c in todos if d == portal.ontem(hoje)]
 
     def no_dia(n):
         alvo = [c for d, c in dias if (d - hoje).days <= n] or [dias[0][1]]
@@ -269,77 +244,127 @@ def _com_colunas_calculadas(df, hoje):
     data_da_coluna = {c: d for d, c in dias}
     zera_em = primeira.map(lambda c: data_da_coluna.get(c) if isinstance(c, str) else None)
 
-    calculadas = pd.DataFrame({
-        "Estoque hoje": valores[dias[0][1]],
+    calculadas = {}
+    if de_ontem:
+        calculadas["Estoque atual"] = planilhas._numeros(df[de_ontem[0]])
+    calculadas.update({
+        "Previsto hoje": valores[dias[0][1]],
         "Estoque em 7 dias": no_dia(7),
         "Estoque em 15 dias": no_dia(15),
         "Estoque em 30 dias": no_dia(30),
         "Menor estoque previsto": valores.min(axis=1),
         "Zera em": zera_em.map(lambda d: datetime(d.year, d.month, d.day) if d else None),
         "Dias até zerar": zera_em.map(lambda d: (d - hoje).days if d else None),
-    }, index=df.index).astype(object)
+    })
+    calculadas = pd.DataFrame(calculadas, index=df.index).astype(object)
     calculadas = calculadas.where(calculadas.notna(), None)
 
-    primeira_de_dia = min(list(df.columns).index(c) for _, c in _colunas_de_dia(df))
+    primeira_de_dia = min(list(df.columns).index(c) for _, c in todos)
     return pd.concat(
         [df.iloc[:, :primeira_de_dia], calculadas, df.iloc[:, primeira_de_dia:]], axis=1
     )
 
 
-def _com_segmento(df, estoque):
-    """Traz Segmento e Marca do relatório de estoque, pelo Código."""
-    if estoque is None or "Código" not in df.columns:
-        return df
-    base = estoque.df.drop_duplicates("Código").set_index("Código")
-    extras = {c: df["Código"].map(base[c]) for c in ("Segmento", "Marca") if c in base.columns}
-    if not extras:
-        return df
-    posicao = 2 if len(df.columns) > 2 else len(df.columns)   # depois de Código e Produto
-    partes = [df.iloc[:, :posicao], pd.DataFrame(extras, index=df.index).astype(object), df.iloc[:, posicao:]]
-    juntas = pd.concat(partes, axis=1)
-    return juntas.where(juntas.notna(), None)
-
-
 # ============================================================
-# TABELAS PRONTAS
+# TABELAS PRONTAS (montadas com os dados do portal)
 # ============================================================
 
-_carregados = {}   # relatorio -> (momento do download, Tabela)
+_carregados = {}   # relatorio -> (momento da leitura, Tabela)
 _trava = threading.Lock()
 
 
-def _ler_tabela(relatorio, conteudo, momento):
-    titulo = RELATORIOS[relatorio][0]
-    PASTA.mkdir(parents=True, exist_ok=True)
-    arquivo = PASTA / f"{relatorio}.xlsx"
-    arquivo.write_bytes(conteudo)
-    lidas = [t for t in planilhas._ler_arquivo(arquivo, nome=f"{titulo}.xlsx") if len(t.df)]
-    if not lidas:
-        raise ErroERP(f"O ERP mandou o relatório {titulo} vazio.")
-    tabela = lidas[0]
-    tabela.nome = f"ERP - {titulo}"
-    tabela.arquivo = f"ERP ({momento:%d/%m %H:%M})"
-    tabela.df = _converter_numeros(tabela.df)
-    return tabela
+def _texto(valor):
+    return "" if valor is None else str(valor).strip()
+
+
+def _df_previsao(dados, tela, festa):
+    """DataFrame de uma previsão do portal, com as colunas que a MAX conhece."""
+    datas = [portal.data_da_coluna(d) for d in dados["datas"]]
+    nomes_dias = [f"{d:%d/%m/%Y}" for d in datas]
+    linhas = []
+    for item in dados["itens"]:
+        linha = {
+            "Código": _texto(item.get("codigo")),
+            "Produto": _texto(item.get("nome")),
+            "Tipo": portal.TIPOS[bool(festa)],
+            "Segmento": _texto(item.get("segmento")),
+            "Categoria": _texto(item.get("categoria")),
+            "Linha": _texto(item.get("linha")),
+            "Unidade": _texto(item.get("unidade")),
+            "Média 4m": item.get("media4m"),
+            "Carteira": item.get("carteira"),
+        }
+        if tela == "produtos":   # a tela de insumos não mostra estas duas
+            linha["Pedidos"] = item.get("numPedidos")
+            linha["Separado"] = item.get("separado")
+        quantidades = item.get("quantidade") or []
+        for i, coluna in enumerate(nomes_dias):
+            linha[coluna] = quantidades[i] if i < len(quantidades) else None
+        linhas.append(linha)
+    return pd.DataFrame(linhas).astype(object)
+
+
+def _origem(momento, dados_lidos):
+    """Texto do campo "baixado": quando a MAX leu e quando o portal calculou o estoque."""
+    texto = f"Portal (lido {momento:%d/%m %H:%M}"
+    calculos = [c for c in (portal.estoque_inicial_calculado_em(d) for d in dados_lidos) if c]
+    if calculos:
+        texto += f"; estoque inicial calculado {min(calculos):%d/%m %H:%M}"
+    return texto + ")"
+
+
+def _montar_previsao(relatorio):
+    titulo, tela, festa = RELATORIOS[relatorio]
+    dados = portal.previsao(tela, festa)
+    momento = dados["momento"]
+    df = _com_colunas_calculadas(_df_previsao(dados, tela, festa), momento.date())
+    return planilhas.Tabela(
+        nome=f"Portal - {titulo}", arquivo=_origem(momento, [dados]), oculta=False,
+        df=df.reset_index(drop=True),
+    )
+
+
+def _montar_estoque():
+    """Estoque atual: fim do dia de ontem na Previsão de Produtos, Descartáveis e depois Festa."""
+    partes, lidos = [], []
+    for festa in (False, True):
+        dados = portal.previsao("produtos", festa)
+        lidos.append(dados)
+        df = _df_previsao(dados, "produtos", festa)
+        coluna = f"{portal.ontem(dados['momento'].date()):%d/%m/%Y}"
+        if coluna not in df.columns:
+            raise ErroERP(f"O portal não mandou a coluna de ontem ({coluna}) na Previsão de Produtos.")
+        partes.append(pd.DataFrame({
+            "Código": df["Código"],
+            "Nome": df["Produto"],
+            "Tipo": df["Tipo"],
+            "Segmento": df["Segmento"],
+            "Categoria": df["Categoria"],
+            "Linha": df["Linha"],
+            "Unidade": df["Unidade"],
+            "Quantidade": df[coluna],
+        }))
+    momento = min(d["momento"] for d in lidos)
+    return planilhas.Tabela(
+        nome=f"Portal - {RELATORIOS['estoque'][0]}", arquivo=_origem(momento, lidos), oculta=False,
+        df=pd.concat(partes, ignore_index=True).astype(object),
+    )
 
 
 def carregar(relatorio):
-    """Baixa (se preciso) e devolve a Tabela do relatório. Pode levar alguns segundos."""
+    """Lê (se preciso) e devolve a Tabela do relatório. Pode levar alguns segundos."""
     if relatorio not in RELATORIOS:
         raise ErroERP(f"Relatório '{relatorio}' não existe. Use um destes: {', '.join(RELATORIOS)}.")
     with _trava:
         item = _carregados.get(relatorio)
-    if item and time.time() - item[0].timestamp() < VALIDADE_MINUTOS * 60:
+    if item and time.time() - item[0].timestamp() < portal.VALIDADE_MINUTOS * 60:
         return item[1]
-
-    estoque = carregar("estoque") if relatorio in ("previsao_produtos", "previsao_produtos_festa") else None
-    momento = datetime.now()
-    tabela = _ler_tabela(relatorio, _baixar(RELATORIOS[relatorio][1]), momento)
-    if relatorio.startswith("previsao"):
-        df = _com_colunas_calculadas(tabela.df, momento.date())
-        tabela.df = _com_segmento(df, estoque).reset_index(drop=True)
+    try:
+        tabela = _montar_estoque() if relatorio == "estoque" else _montar_previsao(relatorio)
+    except portal.ErroPortal as erro:
+        raise ErroERP(str(erro)) from None
     with _trava:
-        _carregados[relatorio] = (momento, tabela)
+        _carregados[relatorio] = (datetime.now(), tabela)
     return tabela
 
 

@@ -41,10 +41,10 @@ A mesma conversa funciona de quatro jeitos:
 - **Consulta qualquer aba** da planilha, incluindo as ocultas: filtra, ordena, soma, tira média, conta e agrupa.
 - **Procura um código ou descrição** em todas as abas de uma vez.
 - **Exporta para Excel** o plano de ação de DOH e também qualquer consulta ou resumo de qualquer aba. No site, aparece um botão **Baixar** embaixo da resposta.
-- **Lê o ERP Bellocopo:** baixa sozinho o estoque atual e as quatro previsões (produtos, insumos, produtos de festa e insumos de festa) e responde coisas como "o que vai zerar nas próximas 3 semanas e em que dia". Também consulta **pedidos**: o que tem num pedido e se algum item pode faltar, e quais pedidos têm um produto, por status. Só lê; nunca altera nada no ERP.
+- **Lê o BelloPortal e o ERP Bellocopo:** lê sozinha no portal o estoque atual e as quatro previsões (produtos e insumos, nos Tipos Descartáveis e Festa) e responde coisas como "o que vai zerar nas próximas 3 semanas e em que dia". Também consulta **pedidos** (ainda pelo ERP): o que tem num pedido e se algum item pode faltar, e quais pedidos têm um produto, por status. Só lê; nunca altera nada no portal nem no ERP.
 - **Abre links da internet:** mande o endereço na conversa e a MAX lê a página para resumir ou responder. Se o link for de uma planilha (Excel, CSV ou Google Planilhas pública), ele baixa e analisa como se fosse uma planilha anexada.
 - **Lê planilhas anexadas no chat** (`.xlsx`, `.xlsm` ou `.csv`, até 30 MB): clique no clipe ao lado da caixa de mensagem ou arraste o arquivo para a janela. A MAX responde com as abas e colunas que encontrou, e dá para pedir análises, somas, rankings e exportações como em qualquer outra aba. Cada pessoa só vê as próprias planilhas anexadas.
-- **Lê PDFs anexados e confere o estoque:** anexe um PDF (pedido, orçamento, lista de itens) do mesmo jeito e peça "esses itens têm em estoque?". A MAX lê o texto e as tabelas do PDF, monta a lista de itens e o Python acha cada um no estoque do ERP pelo código, pelo código de barras (EAN) ou pela descrição, dizendo o que tem estoque, o que está parcial (e quanto falta), o que está zerado e o que não existe no ERP. Itens achados só pela descrição vêm como "provável", para confirmar. PDF escaneado (só imagem) não tem texto e não é lido. Precisa do acesso ao ERP liberado (veja `ERP_USUARIOS`).
+- **Lê PDFs anexados e confere o estoque:** anexe um PDF (pedido, orçamento, lista de itens) do mesmo jeito e peça "esses itens têm em estoque?". A MAX lê o texto e as tabelas do PDF, monta a lista de itens e o Python acha cada um no estoque atual do portal pelo código ou pela descrição, dizendo o que tem estoque, o que está parcial (e quanto falta), o que está zerado e o que não existe no estoque. Itens achados só pela descrição vêm como "provável", para confirmar. PDF escaneado (só imagem) não tem texto e não é lido. Precisa do acesso ao ERP liberado (veja `ERP_USUARIOS`).
 - **Quadro "Estoque por aba"**, com a situação de cada aba em cores de andon (crítica, alta, média, na meta, sem demanda).
 - **Lembra de cada pessoa:** histórico da conversa e memória de longo prazo separados por usuário.
 
@@ -113,7 +113,10 @@ GEMINI_MODELO_MEMORIA=gemini-3.1-flash-lite
 # Opcional: quantas perguntas o site responde ao mesmo tempo (padrão 32)
 MAX_SIMULTANEAS=32
 
-# Opcional: ERP Bellocopo (veja "ERP Bellocopo" mais abaixo)
+# Opcional: estoque e previsões pelo BelloPortal (veja "Portal e ERP Bellocopo")
+PORTAL_USUARIO=email_do_usuario_de_servico
+PORTAL_SENHA=senha_do_usuario_de_servico
+# Opcional: pedidos pelo ERP Bellocopo
 ERP_EMAIL=seu_email_do_erp
 ERP_SENHA=sua_senha_do_erp
 ERP_USUARIOS=Kevin Pereira
@@ -296,7 +299,8 @@ Ficam em `modulos/ferramentas_pcp.py`. O Gemini escolhe sozinho qual chamar, at�
 | `exportar_resumo_excel(aba, filtros, agrupar_por, calculos)` | Excel com os totais por grupo, sem o limite de 60 grupos da conversa. Gera `relatorios/Resumo_<ABA>_<data>.xlsx` |
 | `consultar_pedido_erp(numero)` | Itens de um pedido no ERP (tela Consulta por Pedido): data programada, código, produto, quantidade, estoque na data programada e estoque hoje. Aceita o número com ou sem os zeros do começo |
 | `consultar_pedidos_produto_erp(codigo)` | Pedidos de um produto no ERP (tela Consulta por Produto): data programada, pedido, status e quantidade, com totais por status |
-| `consultar_erp(relatorio)` | Baixa do ERP Bellocopo o `estoque` ou uma previsão (`previsao_produtos`, `previsao_insumos`, `previsao_produtos_festa`, `previsao_insumos_festa`) e devolve o nome da aba (`ERP - ...`) para ler com `consultar_aba` e `resumir_aba` |
+| `estoque_item_portal(item)` | Estoque atual e previsão de **um** item direto do BelloPortal, pelo código ou descrição: procura em Descartáveis e depois em Festa (produtos e depois insumos). É a única fonte de estoque, carteira e previsão: a MAX não responde esses números pelas planilhas |
+| `consultar_erp(relatorio)` | Lê do BelloPortal o `estoque` ou uma previsão (`previsao_produtos`, `previsao_insumos` = Descartáveis; `previsao_produtos_festa`, `previsao_insumos_festa` = Festa) e devolve o nome da aba (`Portal - ...`) para ler com `consultar_aba` e `resumir_aba` |
 | `ler_link(url, parte)` | Abre um link da internet (`modulos/links.py`). Página: devolve o texto, em partes de 15 mil caracteres. Planilha (`.xlsx`, `.xlsm`, `.csv`, Google Planilhas pública ou arquivo do Google Drive): baixa e guarda como planilha anexada da pessoa |
 
 **Links:** a MAX se apresenta aos sites como `MAX-PCP/1.0`. Por isso, sites que não aceitam leitura automática (a Wikipédia, por exemplo) e páginas que pedem login respondem "acesso recusado", e a MAX explica isso ao usuário. Páginas montadas por JavaScript chegam com pouco texto. PDFs ainda não são lidos. Por segurança, links para a rede interna (`localhost`, `192.168...`, `10...`, o nome de outros PCs da empresa) são recusados, para o servidor não servir de ponte até outros computadores. O limite é de 20 segundos por link, 5 MB por página e 30 MB por planilha.
@@ -321,25 +325,26 @@ Os nomes de aba e de coluna podem ser parciais, por exemplo "solicitações", "f
 
 ---
 
-## ERP Bellocopo
+## Portal e ERP Bellocopo
 
-A MAX entra no ERP (`sistema-erp.herokuapp.com`) com o login do `.env` e baixa os mesmos arquivos Excel dos downloads do menu **Inventário**. Fica em `modulos/erp.py`.
+**Estoque e previsões vêm do BelloPortal** (`portal.bellocopo.com.br`, menu Produção). A MAX entra na API do portal (`api-portal.bellocopo.com.br`) com o usuário de serviço do `.env` (`PORTAL_USUARIO` e `PORTAL_SENHA`) e lê as telas **Previsão de Produtos** e **Previsão de Insumos**, nos dois Tipos: **Descartáveis** e **Festa**. Um item de Descartáveis não aparece em Festa e vice-versa, então a MAX procura primeiro em Descartáveis e, se não achar, em Festa. O login fica em `modulos/portal.py` e as tabelas são montadas em `modulos/erp.py`.
 
-| Relatório | De onde vem no ERP | O que tem |
+| Relatório | De onde vem no portal | O que tem |
 |---|---|---|
-| `estoque` | Baixar Estoque Atual | Código, Nome, Segmento, Marca, GTIN-13 e Quantidade |
-| `previsao_produtos` | Previsão de Produtos | Código, Produto, Média 4m, Carteira, Pedidos, Separado e o estoque previsto de cada dia |
-| `previsao_insumos` | Previsão de Insumos | Código, Insumo, Média 4m, Carteira e o estoque previsto de cada dia |
-| `previsao_produtos_festa` | Previsão de Produtos de Festa | Igual à de produtos |
-| `previsao_insumos_festa` | Previsão de Insumos de Festa | Igual à de insumos |
+| `estoque` | Previsão de Produtos, Descartáveis + Festa, coluna de **ontem** | Código, Nome, Tipo, Segmento, Categoria, Linha, Unidade e Quantidade (estoque atual) |
+| `previsao_produtos` | Previsão de Produtos, Tipo Descartáveis | Código, Produto, Tipo, Segmento, Categoria, Linha, Unidade, Média 4m, Carteira, Pedidos, Separado e o saldo previsto de fim de cada dia |
+| `previsao_insumos` | Previsão de Insumos, Tipo Descartáveis | O mesmo, sem Pedidos e Separado |
+| `previsao_produtos_festa` | Previsão de Produtos, Tipo Festa | Igual à de produtos |
+| `previsao_insumos_festa` | Previsão de Insumos, Tipo Festa | Igual à de insumos |
 
-**Pedidos:** a MAX também faz as buscas das telas **Consulta por Pedido** (pelo número; `130101` e `00130101` funcionam) e **Consulta por Produto** (pelo código exato; se a pessoa disser o nome, a MAX acha o código no estoque do ERP antes). Ele lê a tabela do resultado, sem a linha de total, e soma os pedidos por status. Segundo o ERP, o **Estoque na Data Programada** considera as caixas reservadas, e o **Estoque Hoje** é o estoque do início do dia; quando o estoque na data programada é negativo, a MAX avisa que o item pode faltar.
+**Estoque atual:** é o saldo de fim do dia de ontem na Previsão de Produtos (regra do PCP). Estoque, carteira, média e previsão de um item vêm **só do portal**: a MAX não usa as planilhas (ANÁLISE DIÁRIA, BD.ESTOQUE CARTEIRA...) para esses números, que ficam só para DOH, prioridade e plano de ação.
 
-- **Só leitura:** as únicas chamadas ao ERP são o login, esses 5 downloads e as 2 buscas de pedidos. A lista fica em `CHAMADAS_PERMITIDAS`, em `modulos/erp.py`, e qualquer outra é recusada pelo próprio código. A MAX nunca usa "Atualizar previsão", "Atualizar Estoques" nem telas que gravem algo.
-- **Previsões:** baixadas com 1 dia anterior e 30 dias para prever, o máximo que o ERP aceita. A MAX acrescenta as colunas **Estoque hoje**, **Estoque em 7, 15 e 30 dias**, **Menor estoque previsto**, **Zera em** (primeiro dia com estoque previsto zero ou negativo) e **Dias até zerar**. Nos produtos, traz também **Segmento** e **Marca** do relatório de estoque.
-- **Números:** o ERP usa ponto decimal (`92.25`); a MAX converte na leitura, para não confundir com o ponto de milhar das planilhas da empresa.
-- **Atualização:** cada relatório é baixado quando alguém pergunta e vale por 10 minutos. Os arquivos ficam em `erp/` (fora do Git). Se a sessão do ERP expirar, a MAX entra de novo sozinha.
-- **Quem pode usar:** só os nomes em `ERP_USUARIOS`, separados por vírgula: o mesmo nome com que a pessoa entra na MAX (maiúsculas, acentos, hífens e apóstrofos não importam; o nome da pasta, como `kevin_pereira`, também serve), e, por padrão, **só em perguntas feitas no próprio PC que roda a MAX** (`ERP_SO_NESTE_PC=1`), porque a MAX entra no ERP com o login de uma pessoa. Para liberar os colegas da lista em outros PCs: peça a quem administra o ERP um usuário só de leitura para a MAX, coloque-o em `ERP_EMAIL` e `ERP_SENHA` e use `ERP_SO_NESTE_PC=0`. Como cada pessoa entra na MAX com a própria senha, ninguém consegue usar o nome de outra. A janela do `max.py` sempre pode.
+**Pedidos ainda vêm do ERP** (`sistema-erp.herokuapp.com`, login `ERP_EMAIL` e `ERP_SENHA`), até o portal ter essas telas. A MAX faz as buscas das telas **Consulta por Pedido** (pelo número; `130101` e `00130101` funcionam) e **Consulta por Produto** (pelo código exato; se a pessoa disser o nome, a MAX acha o código no estoque antes). Ela lê a tabela do resultado, sem a linha de total, e soma os pedidos por status. Segundo o ERP, o **Estoque na Data Programada** considera as caixas reservadas, e o **Estoque Hoje** é o estoque do início do dia; quando o estoque na data programada é negativo, a MAX avisa que o item pode faltar.
+
+- **Só leitura:** no portal, as únicas chamadas são o login e as 2 telas de previsão (`CHAMADAS_PERMITIDAS` em `modulos/portal.py`); no ERP, o login e as 2 buscas de pedidos (`CHAMADAS_PERMITIDAS` em `modulos/erp.py`). Qualquer outra é recusada pelo próprio código. A MAX nunca usa "Atualizar pedidos", "Recalcular estoque inicial" nem telas que gravem algo.
+- **Previsões:** lidas com 1 dia anterior (ontem) e 30 dias para frente. A MAX acrescenta as colunas **Estoque atual** (fim de ontem), **Previsto hoje**, **Estoque em 7, 15 e 30 dias**, **Menor estoque previsto**, **Zera em** (primeiro dia com estoque previsto zero ou negativo) e **Dias até zerar**.
+- **Atualização:** cada relatório é lido quando alguém pergunta e vale por 10 minutos. Se o token do portal ou a sessão do ERP expirar, a MAX entra de novo sozinha.
+- **Quem pode usar (portal e ERP):** só os nomes em `ERP_USUARIOS`, separados por vírgula: o mesmo nome com que a pessoa entra na MAX (maiúsculas, acentos, hífens e apóstrofos não importam; o nome da pasta, como `kevin_pereira`, também serve), e, por padrão, **só em perguntas feitas no próprio PC que roda a MAX** (`ERP_SO_NESTE_PC=1`), porque a MAX entra no ERP com o login de uma pessoa. Para liberar os colegas da lista em outros PCs: peça a quem administra o ERP um usuário só de leitura para a MAX, coloque-o em `ERP_EMAIL` e `ERP_SENHA` e use `ERP_SO_NESTE_PC=0`. Como cada pessoa entra na MAX com a própria senha, ninguém consegue usar o nome de outra. A janela do `max.py` sempre pode.
 
 ---
 
@@ -398,7 +403,8 @@ projeto_MAX_IA/
 │   ├── ferramentas_pcp.py    Ferramentas do Gemini e o quadro "Estoque por aba"
 │   ├── planilhas.py          Leitura, filtros e resumos de qualquer aba
 │   ├── links.py              Leitura de links: páginas e planilhas online
-│   ├── erp.py                Login e downloads do ERP Bellocopo (estoque e previsões)
+│   ├── erp.py                Tabelas de estoque e previsões (do portal) e pedidos do ERP
+│   ├── portal.py             Login e leitura da API do BelloPortal (previsões)
 │   ├── base_dados.py         Leitura das abas de análise e filtro do PET
 │   ├── plano_acao.py         Cálculo da prioridade e da necessidade; Excel do plano
 │   ├── assistente.py         Respostas por regras (versão antiga, sem Gemini)

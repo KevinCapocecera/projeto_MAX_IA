@@ -29,7 +29,7 @@ from pathlib import Path
 from flask import Flask, Response, abort, jsonify, request, send_from_directory, session
 from flask.sessions import SecureCookieSessionInterface
 
-from modulos import base_dados, contas, erp, ferramentas_pcp, planilhas
+from modulos import base_dados, contas, erp, ferramentas_pcp, planilhas, portal
 from modulos.nucleo import Max
 
 
@@ -558,11 +558,14 @@ def main():
     else:
         print(f"Planilhas: NÃO consegui abrir {pasta} (confira a rede ou MAX_PASTA_DADOS no .env).")
     if not erp.configurado():
-        print("ERP: DESLIGADO (faltam ERP_EMAIL e ERP_SENHA no .env).")
+        print("Portal/ERP: DESLIGADOS (faltam PORTAL_USUARIO/PORTAL_SENHA e ERP_EMAIL/ERP_SENHA no .env).")
     else:
         lista = os.getenv("ERP_USUARIOS", "").strip() or "ninguém (ERP_USUARIOS está vazio)"
         onde = "só neste PC" if erp.so_neste_pc() else "em qualquer PC"
-        print(f"ERP: ligado para {lista} ({onde}).")
+        fontes = []
+        fontes.append("portal (estoque e previsões)" if portal.configurado() else "portal DESLIGADO")
+        fontes.append("ERP (pedidos)" if erp.erp_configurado() else "ERP DESLIGADO")
+        print(f"Portal/ERP: {', '.join(fontes)}; liberado para {lista} ({onde}).")
     print("Para desligar, feche esta janela ou aperte Ctrl+C.\n", flush=True)
 
     from waitress import serve
