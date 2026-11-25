@@ -107,7 +107,7 @@ GEMINI_API_KEY=sua_chave_aqui
 
 # Opcional: troca os modelos sem mexer no código
 GEMINI_MODELO=gemini-3.5-flash-lite
-GEMINI_MODELO_RESERVA=gemini-3.1-flash-lite,gemini-2.5-flash-lite
+GEMINI_MODELO_RESERVA=gemini-3.1-flash-lite,gemini-3.5-flash
 GEMINI_MODELO_MEMORIA=gemini-3.1-flash-lite
 
 # Opcional: quantas perguntas o site responde ao mesmo tempo (padrão 32)

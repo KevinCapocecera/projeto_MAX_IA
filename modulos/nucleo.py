@@ -40,7 +40,7 @@ load_dotenv(BASE_DIR / ".env")
 
 # Os modelos podem ser trocados no .env, sem mexer no código:
 #   GEMINI_MODELO=gemini-3.5-flash-lite
-#   GEMINI_MODELO_RESERVA=gemini-3.1-flash-lite,gemini-2.5-flash-lite
+#   GEMINI_MODELO_RESERVA=gemini-3.1-flash-lite,gemini-3.5-flash
 #       (um ou mais, separados por vírgula; vazio = sem reserva)
 #   GEMINI_MODELO_MEMORIA=gemini-3.1-flash-lite
 # Cada modelo tem a sua própria cota no Google, então os reservas
@@ -49,7 +49,7 @@ MODELO = os.getenv("GEMINI_MODELO", "").strip() or "gemini-3.5-flash-lite"
 MODELOS_RESERVA = [
     nome.strip()
     for nome in os.getenv(
-        "GEMINI_MODELO_RESERVA", "gemini-3.1-flash-lite,gemini-2.5-flash-lite"
+        "GEMINI_MODELO_RESERVA", "gemini-3.1-flash-lite,gemini-3.5-flash"
     ).split(",")
     if nome.strip() and nome.strip() != MODELO
 ]
@@ -326,6 +326,12 @@ class Max:
                     return resposta
                 except erros_genai.APIError as erro:
                     codigo = getattr(erro, "code", None)
+                    if codigo == 404 and modelo != MODELO:
+                        # Modelo reserva que o Google desativou: pula
+                        # para o próximo em vez de mostrar o 404.
+                        _log(f"{modelo} não existe mais (erro 404), pulando.")
+                        ultimo_erro = ultimo_erro or erro
+                        break
                     if codigo not in CODIGOS_PASSAGEIROS:
                         raise
                     ultimo_erro = erro
