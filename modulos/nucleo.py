@@ -45,11 +45,11 @@ load_dotenv(BASE_DIR / ".env")
 #   GEMINI_MODELO_MEMORIA=gemini-3.1-flash-lite
 # Cada modelo tem a sua própria cota no Google, então os reservas
 # somam capacidade quando o principal bate no limite por minuto.
-MODELO = os.getenv("GEMINI_MODELO", "").strip() or "gemini-3.5-flash-lite"
+MODELO = os.getenv("GEMINI_MODELO", "").strip() or "gemini-3.1-flash-lite"
 MODELOS_RESERVA = [
     nome.strip()
     for nome in os.getenv(
-        "GEMINI_MODELO_RESERVA", "gemini-3.1-flash-lite,gemini-3.5-flash"
+        "GEMINI_MODELO_RESERVA", "gemini-3.5-flash-lite,gemini-3.5-flash"
     ).split(",")
     if nome.strip() and nome.strip() != MODELO
 ]
